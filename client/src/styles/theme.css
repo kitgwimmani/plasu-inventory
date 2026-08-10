@@ -87,6 +87,18 @@ body {
   color: #8a5c00;
 }
 
+.plasu-stat-card.clickable {
+  display: block;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.plasu-stat-card.clickable:hover,
+.plasu-stat-card.clickable:focus-visible {
+  box-shadow: 0 4px 14px rgba(11, 61, 31, 0.18);
+  transform: translateY(-2px);
+}
+
 /* ---------- Login ---------- */
 .login-wrapper {
   min-height: 100vh;

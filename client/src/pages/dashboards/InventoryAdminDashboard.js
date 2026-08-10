@@ -33,10 +33,10 @@ export default function InventoryAdminDashboard() {
       </p>
 
       <Row>
-        <StatCard label="Awaiting Approval" value={stats.pendingApproval} warn={stats.pendingApproval > 0} />
-        <StatCard label="Awaiting Signoff/Issue" value={stats.awaitingIssue} />
-        <StatCard label="Issued This Year" value={stats.issuedThisYear} />
-        <StatCard label="Low Stock Items" value={stats.lowStockItems.length} warn={stats.lowStockItems.length > 0} />
+        <StatCard label="Awaiting Approval" value={stats.pendingApproval} warn={stats.pendingApproval > 0} to="/requisitions?status=pending" />
+        <StatCard label="Awaiting Signoff/Issue" value={stats.awaitingIssue} to="/requisitions?status=approved" />
+        <StatCard label="Issued This Year" value={stats.issuedThisYear} to="/requisitions?status=issued&preset=year" />
+        <StatCard label="Low Stock Items" value={stats.lowStockItems.length} warn={stats.lowStockItems.length > 0} to="/inventory?status=low" />
       </Row>
 
       <Row>

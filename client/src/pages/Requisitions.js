@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Card, Table, Button, Alert, Form } from "react-bootstrap";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import StatusBadge from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
@@ -15,12 +15,13 @@ const FULL_ACCESS_ROLES = ["superadmin", "ictadmin", "inventoryadmin"];
 export default function Requisitions() {
   const { user } = useAuth();
   const canSeeAll = FULL_ACCESS_ROLES.includes(user.role);
+  const [searchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(searchParams.get("status") || "");
   const [departmentId, setDepartmentId] = useState("");
-  const [preset, setPreset] = useState("all");
+  const [preset, setPreset] = useState(searchParams.get("preset") || "all");
   const [error, setError] = useState("");
 
   const load = useCallback(() => {

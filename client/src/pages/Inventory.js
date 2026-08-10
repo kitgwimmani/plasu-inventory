@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Card, Table, Button, Modal, Form, Alert, Badge, Row, Col, OverlayTrigger, Tooltip, Spinner } from "react-bootstrap";
+import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import Toolbar from "../components/Toolbar";
@@ -27,11 +28,12 @@ export default function Inventory() {
   const canAddItems = user.role === "superadmin" || user.role === "ictadmin";
   const canReceiveStock = user.role === "inventoryadmin" || canAddItems;
 
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(searchParams.get("status") || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");

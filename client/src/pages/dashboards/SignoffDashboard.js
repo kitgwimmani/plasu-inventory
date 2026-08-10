@@ -36,7 +36,7 @@ export default function SignoffDashboard() {
       </p>
 
       <Row>
-        <StatCard label="Awaiting My Signature" value={stats.awaitingMySignoffCount} warn={stats.awaitingMySignoffCount > 0} md={4} />
+        <StatCard label="Awaiting My Signature" value={stats.awaitingMySignoffCount} warn={stats.awaitingMySignoffCount > 0} md={4} to="/requisitions?status=approved" />
         <StatCard label="Total Signed by Me" value={stats.signedByMeCount} md={4} />
       </Row>
 

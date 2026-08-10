@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Card, Table, Button, Modal, Form, Alert, Badge, Row, Col } from "react-bootstrap";
+import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import { ROLE_LABELS } from "../context/AuthContext";
 import Toolbar from "../components/Toolbar";
@@ -9,11 +10,12 @@ import usePagination from "../hooks/usePagination";
 const EMPTY_FORM = { name: "", email: "", password: "", role: "hod", department_id: "" };
 
 export default function Users() {
+  const [searchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") || "");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showModal, setShowModal] = useState(false);

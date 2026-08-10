@@ -36,16 +36,16 @@ export default function AdminDashboard() {
       </p>
 
       <Row>
-        <StatCard label="Total Users" value={stats.totalUsers} />
-        <StatCard label="Active Users" value={stats.activeUsers} />
-        <StatCard label="Inventory Items" value={stats.totalItems} />
-        <StatCard label="Low Stock Items" value={stats.lowStockItems} warn={stats.lowStockItems > 0} />
+        <StatCard label="Total Users" value={stats.totalUsers} to="/users" />
+        <StatCard label="Active Users" value={stats.activeUsers} to="/users?status=active" />
+        <StatCard label="Inventory Items" value={stats.totalItems} to="/inventory" />
+        <StatCard label="Low Stock Items" value={stats.lowStockItems} warn={stats.lowStockItems > 0} to="/inventory?status=low" />
       </Row>
       <Row>
-        <StatCard label="Pending Requisitions" value={stats.pendingRequisitions} />
-        <StatCard label="Approved (Awaiting Issue)" value={stats.approvedRequisitions} />
-        <StatCard label="Issued Requisitions" value={stats.issuedRequisitions} />
-        <StatCard label="Rejected Requisitions" value={stats.rejectedRequisitions} />
+        <StatCard label="Pending Requisitions" value={stats.pendingRequisitions} to="/requisitions?status=pending" />
+        <StatCard label="Approved (Awaiting Issue)" value={stats.approvedRequisitions} to="/requisitions?status=approved" />
+        <StatCard label="Issued Requisitions" value={stats.issuedRequisitions} to="/requisitions?status=issued" />
+        <StatCard label="Rejected Requisitions" value={stats.rejectedRequisitions} to="/requisitions?status=rejected" />
       </Row>
 
       <Row>
