@@ -1,0 +1,440 @@
+:root {
+  --plasu-green-dark: #0b3d1f;
+  --plasu-green: #0f6b2c;
+  --plasu-green-light: #e8f5ea;
+  --plasu-gold: #d9a441;
+  --plasu-gray: #4a4a4a;
+}
+
+body {
+  background-color: #f4f8f5;
+  color: #212529;
+}
+
+/* ---------- Navbar ---------- */
+.plasu-navbar {
+  background: linear-gradient(90deg, var(--plasu-green-dark), var(--plasu-green));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.plasu-navbar .navbar-brand,
+.plasu-navbar .nav-link {
+  color: #ffffff !important;
+}
+
+.plasu-navbar .nav-link.active {
+  color: var(--plasu-gold) !important;
+  font-weight: 600;
+}
+
+.plasu-brand-title {
+  line-height: 1.1;
+}
+
+.plasu-brand-title small {
+  display: block;
+  font-size: 0.65rem;
+  color: #d7e9db;
+  font-weight: 400;
+}
+
+/* ---------- Buttons ---------- */
+.btn-plasu {
+  background-color: var(--plasu-green);
+  border-color: var(--plasu-green);
+  color: #fff;
+}
+.btn-plasu:hover,
+.btn-plasu:focus {
+  background-color: var(--plasu-green-dark);
+  border-color: var(--plasu-green-dark);
+  color: #fff;
+}
+
+.btn-outline-plasu {
+  color: var(--plasu-green);
+  border-color: var(--plasu-green);
+  background: transparent;
+}
+.btn-outline-plasu:hover {
+  background-color: var(--plasu-green);
+  color: #fff;
+}
+
+/* ---------- Cards / Panels ---------- */
+.plasu-card {
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 10px rgba(11, 61, 31, 0.08);
+}
+
+.plasu-stat-card {
+  border-left: 5px solid var(--plasu-green);
+  border-radius: 0.6rem;
+  background: #fff;
+}
+
+.plasu-stat-card .stat-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--plasu-green-dark);
+}
+
+.plasu-stat-card.warn {
+  border-left-color: var(--plasu-gold);
+}
+.plasu-stat-card.warn .stat-value {
+  color: #8a5c00;
+}
+
+/* ---------- Login ---------- */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top, #12492a, var(--plasu-green-dark) 70%);
+}
+
+.login-card {
+  border-radius: 1rem;
+  overflow: hidden;
+  max-width: 420px;
+  width: 100%;
+}
+
+.login-header {
+  background: var(--plasu-green-dark);
+  color: #fff;
+  text-align: center;
+  padding: 2rem 1.5rem 1.25rem;
+}
+
+.login-header img {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 0.75rem;
+}
+
+/* ---------- Sidebar / Layout ---------- */
+.plasu-sidebar {
+  background: #fff;
+  min-height: calc(100vh - 56px);
+  border-right: 1px solid #e2e8e4;
+}
+
+.plasu-sidebar .nav-link {
+  color: var(--plasu-gray);
+  border-radius: 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.plasu-sidebar .nav-link.active,
+.plasu-sidebar .nav-link:hover {
+  background-color: var(--plasu-green-light);
+  color: var(--plasu-green-dark);
+  font-weight: 600;
+}
+
+/* ---------- Badges ---------- */
+.badge-status-pending { background-color: #d9a441; color: #3a2b00; }
+.badge-status-approved { background-color: #2f7fd1; color: #fff; }
+.badge-status-issued { background-color: var(--plasu-green); color: #fff; }
+.badge-status-rejected { background-color: #b3261e; color: #fff; }
+
+/* ---------- Tables ---------- */
+.table-plasu thead {
+  background-color: var(--plasu-green-light);
+}
+
+.plasu-footer {
+  text-align: center;
+  padding: 1rem 0;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+/* ---------- Compact tables ---------- */
+.table-compact td, .table-compact th {
+  padding: 0.5rem 0.6rem;
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.best-fit-qty {
+  cursor: help;
+  border-bottom: 1px dashed var(--plasu-gray);
+}
+
+/* ---------- Toolbar (search + filters), reused across every growable table ---------- */
+.data-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.toolbar-search {
+  max-width: 320px;
+  flex: 1 1 220px;
+}
+
+.toolbar-clear {
+  cursor: pointer;
+}
+
+.toolbar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.toolbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ---------- Pager ---------- */
+.pager-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid #eef2ee;
+}
+
+/* ---------- Tabs (Reports page) ---------- */
+.plasu-tabs .nav-link {
+  color: var(--plasu-gray);
+  font-weight: 500;
+}
+.plasu-tabs .nav-link.active {
+  color: var(--plasu-green-dark) !important;
+  font-weight: 700;
+  border-bottom: 3px solid var(--plasu-green);
+}
+
+/* ---------- Notification bell ---------- */
+.bell-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  font-size: 1.15rem;
+}
+.bell-toggle::after {
+  display: none;
+}
+.bell-badge {
+  position: absolute;
+  top: 2px;
+  right: -2px;
+  font-size: 0.6rem;
+  padding: 0.25em 0.4em;
+}
+.notification-menu {
+  width: 340px;
+  max-width: 90vw;
+  padding: 0;
+  overflow: hidden;
+}
+.notification-list {
+  max-height: 380px;
+  overflow-y: auto;
+}
+.notification-item {
+  white-space: normal;
+  border-bottom: 1px solid #f1f3f1;
+  padding: 0.6rem 0.9rem;
+}
+.notification-item.unread {
+  background-color: var(--plasu-green-light);
+}
+.notification-icon {
+  color: var(--plasu-green);
+  margin-top: 0.15rem;
+}
+.notification-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #212529;
+}
+.notification-message {
+  font-size: 0.78rem;
+  color: #6c757d;
+}
+.notification-time {
+  font-size: 0.7rem;
+  color: #9aa39c;
+  margin-top: 0.15rem;
+}
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--plasu-gold);
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Printable reports & receipts: institution letterhead, watermark, and
+   signature blocks. The overlay covers the full viewport in the app; the
+   @media print block below hides everything else so only this prints.
+   ========================================================================== */
+.print-overlay {
+  position: fixed;
+  inset: 0;
+  background: #f4f8f5;
+  z-index: 2000;
+  overflow-y: auto;
+}
+.print-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #e2e8e4;
+  padding: 0.75rem 1.5rem;
+}
+.print-page-scroll {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.print-page {
+  background: #fff;
+  width: 100%;
+  max-width: 900px;
+  padding: 2.5rem;
+  position: relative;
+  box-shadow: 0 2px 16px rgba(11, 61, 31, 0.12);
+  min-height: 600px;
+}
+
+.print-letterhead {
+  position: relative;
+}
+.letterhead-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+}
+.letterhead-logo {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+.letterhead-institution {
+  flex: 1;
+}
+.institution-name {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--plasu-green-dark);
+}
+.institution-sub {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+.letterhead-meta {
+  font-size: 0.78rem;
+  color: #495057;
+  text-align: right;
+}
+.letterhead-title {
+  margin-top: 1rem;
+  position: relative;
+  z-index: 1;
+}
+.letterhead-title h4 {
+  margin-bottom: 0.15rem;
+  color: var(--plasu-green-dark);
+}
+
+.report-summary-row {
+  position: relative;
+  z-index: 1;
+  background: var(--plasu-green-light);
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.watermark {
+  position: absolute;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-32deg);
+  font-size: 3.6rem;
+  font-weight: 800;
+  color: rgba(15, 107, 44, 0.07);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 0;
+  letter-spacing: 0.1em;
+}
+
+.signature-block {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-top: 3rem;
+  position: relative;
+  z-index: 1;
+}
+.signature-line {
+  flex: 1 1 220px;
+  text-align: center;
+}
+.sig-space {
+  min-height: 1.4rem;
+  font-family: "Brush Script MT", cursive;
+  font-size: 1.1rem;
+  color: #212529;
+}
+.sig-underline {
+  border-top: 1px solid #212529;
+  margin-top: 0.25rem;
+}
+.sig-label {
+  font-size: 0.78rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-overlay, .print-overlay * {
+    visibility: visible;
+  }
+  .print-overlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page-scroll {
+    padding: 0;
+  }
+  .print-page {
+    box-shadow: none;
+    max-width: 100%;
+    padding: 0.5in;
+  }
+}
