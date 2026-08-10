@@ -6,6 +6,7 @@ import StatusBadge from "../components/StatusBadge";
 import { useAuth } from "../context/AuthContext";
 import PrintOverlay from "../components/print/PrintOverlay";
 import ReceiptView from "../components/print/ReceiptView";
+import { formatDateTime } from "../utils/formatDate";
 
 const SIGNOFF_LABELS = {
   requester: "Requester / User (HOD)",
@@ -118,17 +119,17 @@ export default function RequisitionDetail() {
         <Row>
           <Col md={8}><strong>Purpose:</strong> {req.purpose}</Col>
           <Col md={4} className="text-md-end text-muted">
-            Raised: {new Date(req.created_at).toLocaleString()}
+            Raised: {formatDateTime(req.created_at)}
           </Col>
         </Row>
         {req.status === "rejected" && (
           <Alert variant="danger" className="mt-3 mb-0">
-            Rejected on {new Date(req.rejected_at).toLocaleString()}. Reason: {req.rejection_reason || "—"}
+            Rejected on {formatDateTime(req.rejected_at)}. Reason: {req.rejection_reason || "—"}
           </Alert>
         )}
         {req.status === "issued" && (
           <Alert variant="success" className="mt-3 mb-0">
-            Issued on {new Date(req.issued_at).toLocaleString()} by {req.issued_by_name}.
+            Issued on {formatDateTime(req.issued_at)} by {req.issued_by_name}.
           </Alert>
         )}
       </Card>
@@ -181,7 +182,7 @@ export default function RequisitionDetail() {
                       {s.signed ? <Badge bg="success">Signed</Badge> : <Badge bg="secondary">Pending</Badge>}
                     </td>
                     <td>{s.signed_by_name || "—"}</td>
-                    <td>{s.signed_at ? new Date(s.signed_at).toLocaleString() : "—"}</td>
+                    <td>{s.signed_at ? formatDateTime(s.signed_at) : "—"}</td>
                     {req.status === "approved" && (
                       <td>
                         {!canAct ? null : s.signed ? (

@@ -13,6 +13,7 @@ import PrintOverlay from "../components/print/PrintOverlay";
 import InventoryReportPrint from "../components/print/InventoryReportPrint";
 import RequisitionsReportPrint from "../components/print/RequisitionsReportPrint";
 import { presetLabel, presetToRange } from "../utils/dateRanges";
+import { formatDate } from "../utils/formatDate";
 
 const FULL_ACCESS_ROLES = ["superadmin", "ictadmin", "inventoryadmin"];
 
@@ -309,7 +310,7 @@ function RequisitionsReportTab({ user }) {
                     <td>{r.hod_name}</td>
                     <td className="text-truncate" style={{ maxWidth: 220 }}>{r.purpose}</td>
                     <td><StatusBadge status={r.status} plain /></td>
-                    <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td>{formatDate(r.created_at)}</td>
                     <td>
                       <Button as={Link} to={`/requisitions/${r.id}`} size="sm" variant="outline-secondary">View</Button>
                     </td>

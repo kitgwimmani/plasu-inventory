@@ -8,6 +8,7 @@ import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
 import { presetToRange } from "../utils/dateRanges";
+import { formatDate } from "../utils/formatDate";
 
 const FULL_ACCESS_ROLES = ["superadmin", "ictadmin", "inventoryadmin"];
 
@@ -114,7 +115,7 @@ export default function Requisitions() {
                 <td>{r.department_name_current || r.department}</td>
                 <td className="text-truncate" style={{ maxWidth: 260 }}>{r.purpose}</td>
                 <td><StatusBadge status={r.status} plain /></td>
-                <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                <td>{formatDate(r.created_at)}</td>
                 <td>
                   <Button as={Link} to={`/requisitions/${r.id}`} size="sm" className="btn-outline-plasu">
                     View

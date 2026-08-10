@@ -4,6 +4,7 @@ import api from "../api/axios";
 import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
+import { formatDateTime } from "../utils/formatDate";
 
 export default function AuditLog() {
   const [logs, setLogs] = useState([]);
@@ -61,7 +62,7 @@ export default function AuditLog() {
           <tbody>
             {pageRows.map((log) => (
               <tr key={log.id}>
-                <td>{new Date(log.created_at).toLocaleString()}</td>
+                <td>{formatDateTime(log.created_at)}</td>
                 <td>{log.actor_email || "—"}</td>
                 <td><Badge bg="secondary">{log.action}</Badge></td>
                 <td>{log.entity_type} #{log.entity_id}</td>

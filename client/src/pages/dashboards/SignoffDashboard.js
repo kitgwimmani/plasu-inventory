@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import api from "../../api/axios";
 import StatCard from "../../components/StatCard";
 import { useAuth, ROLE_LABELS } from "../../context/AuthContext";
+import { formatDate } from "../../utils/formatDate";
 
 export default function SignoffDashboard() {
   const { user } = useAuth();
@@ -57,7 +58,7 @@ export default function SignoffDashboard() {
                 <td>{r.req_no}</td>
                 <td>{r.department}</td>
                 <td>{r.purpose}</td>
-                <td>{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : "—"}</td>
+                <td>{r.approved_at ? formatDate(r.approved_at) : "—"}</td>
                 <td>
                   <Button as={Link} to={`/requisitions/${r.id}`} size="sm" className="btn-plasu">
                     Review &amp; Sign

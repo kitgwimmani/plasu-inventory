@@ -2,6 +2,7 @@ import React from "react";
 import { Table } from "react-bootstrap";
 import Letterhead from "./Letterhead";
 import SignatureBlock from "./SignatureBlock";
+import { formatDate, formatDateTime } from "../../utils/formatDate";
 
 const SIGNOFF_LABELS = {
   requester: "Requester / User (HOD)",
@@ -22,8 +23,8 @@ export default function ReceiptView({ requisition }) {
         subtitle={`Requisition ${r.req_no}`}
         meta={[
           { label: "SRV No.", value: r.req_no },
-          { label: "Date Issued", value: r.issued_at ? new Date(r.issued_at).toLocaleDateString() : "—" },
-          { label: "Printed", value: new Date().toLocaleString() },
+          { label: "Date Issued", value: r.issued_at ? formatDate(r.issued_at) : "—" },
+          { label: "Printed", value: formatDateTime(new Date()) },
         ]}
       />
 

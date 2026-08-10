@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import api from "../../api/axios";
 import StatCard from "../../components/StatCard";
 import StatusBadge from "../../components/StatusBadge";
+import { formatDate } from "../../utils/formatDate";
 
 export default function HodDashboard() {
   const [stats, setStats] = useState(null);
@@ -60,7 +61,7 @@ export default function HodDashboard() {
                 <td>{r.req_no}</td>
                 <td>{r.purpose}</td>
                 <td><StatusBadge status={r.status} /></td>
-                <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                <td>{formatDate(r.created_at)}</td>
                 <td>
                   <Button as={Link} to={`/requisitions/${r.id}`} size="sm" variant="outline-plasu" className="btn-outline-plasu">
                     View

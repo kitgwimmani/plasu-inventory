@@ -3,6 +3,7 @@ import { Row, Card, Table, Alert, Spinner, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import api from "../../api/axios";
 import StatCard from "../../components/StatCard";
+import { formatDate } from "../../utils/formatDate";
 
 export default function InventoryAdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -50,7 +51,7 @@ export default function InventoryAdminDashboard() {
               {stats.pendingList.map((r) => (
                 <tr key={r.id}>
                   <td><Link to={`/requisitions/${r.id}`}>{r.req_no}</Link></td>
-                  <td>{new Date(r.created_at).toLocaleDateString()}</td>
+                  <td>{formatDate(r.created_at)}</td>
                 </tr>
               ))}
               {stats.pendingList.length === 0 && <tr><td colSpan={2} className="text-muted text-center">Nothing pending.</td></tr>}
@@ -66,7 +67,7 @@ export default function InventoryAdminDashboard() {
               {stats.awaitingIssueList.map((r) => (
                 <tr key={r.id}>
                   <td><Link to={`/requisitions/${r.id}`}>{r.req_no}</Link></td>
-                  <td>{r.approved_at ? new Date(r.approved_at).toLocaleDateString() : "—"}</td>
+                  <td>{r.approved_at ? formatDate(r.approved_at) : "—"}</td>
                 </tr>
               ))}
               {stats.awaitingIssueList.length === 0 && <tr><td colSpan={2} className="text-muted text-center">None waiting.</td></tr>}

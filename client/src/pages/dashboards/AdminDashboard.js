@@ -3,6 +3,7 @@ import { Row, Card, Table, Badge, Alert, Spinner } from "react-bootstrap";
 import api from "../../api/axios";
 import StatCard from "../../components/StatCard";
 import { useAuth, ROLE_LABELS } from "../../context/AuthContext";
+import { formatDateTime } from "../../utils/formatDate";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -77,7 +78,7 @@ export default function AdminDashboard() {
           <tbody>
             {stats.recentActivity.map((log) => (
               <tr key={log.id}>
-                <td>{new Date(log.created_at).toLocaleString()}</td>
+                <td>{formatDateTime(log.created_at)}</td>
                 <td>{log.actor_email || "—"}</td>
                 <td><Badge bg="secondary">{log.action}</Badge></td>
                 <td>{log.entity_type} #{log.entity_id}</td>
