@@ -1,119 +1,113 @@
 # Deploying PLASU SMIS to the Contabo VPS
 
-Target server: **`80.241.214.47`** (Ubuntu 22.04 / 24.04)
+Target server: **`80.241.214.47`** (Ubuntu)
 
-Architecture on the box:
+Current live setup ("Option B" — manual, then wired for CI):
 
 ```
-Internet ──► nginx :80  ──► /opt/plasu-smis/client/build      (static React app)
-                        └─► /api, /public  ──► Node API 127.0.0.1:5000 (systemd: plasu-smis)
-                                                    └─► SQLite file  server/db/plasu_smis.sqlite
+Internet ─► nginx :80 ─► /home/deploy/plasu/plasu-inventory-deployed/client/build   (static React app)
+                      └► /api, /public ─► Node API 127.0.0.1:5000  (pm2: "plasu-smis")
+                                              └► SQLite  server/db/plasu_smis.sqlite
 ```
+
+- SSH / app user: **`deploy`**
+- Repo path: **`/home/deploy/plasu/plasu-inventory-deployed`**
+- Process manager: **pm2**, app name **`plasu-smis`** (defined in `deploy/ecosystem.config.js`)
+
+> `deploy/setup.sh` + `deploy/plasu-smis.service` are an alternative from-scratch
+> path (root, `/opt/plasu-smis`, systemd). Ignore them unless you rebuild the box.
 
 ---
 
-## 1. One-time server setup
+## 1. Auto-deploy on `git push` (GitHub Actions)
 
-SSH in as root and run the provisioning script. It installs Node 22, nginx,
-creates the `plasu` service user, clones the repo to `/opt/plasu-smis`,
-generates a `JWT_SECRET`, installs the systemd unit + nginx site, opens the
-firewall, builds, and starts everything.
+`.github/workflows/deploy.yml` runs on every push to `main`: it builds the app on
+a runner as a sanity check, then SSHes into the VPS and runs `deploy/deploy.sh`
+(git reset → `npm ci` → `npm run build` → `pm2 reload` → `/api/health` check).
 
-```bash
-ssh root@80.241.214.47
-git clone https://github.com/kitgwimmani/plasu-inventory-deployed.git /opt/plasu-smis
-bash /opt/plasu-smis/deploy/setup.sh https://github.com/kitgwimmani/plasu-inventory-deployed.git main
-```
+### a. Authorise the CI key on the server (once)
 
-For a **private** GitHub repo, first give the server read access — either a
-[deploy key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
-or a Personal Access Token in the clone URL. This access must stay in place: every
-deploy runs `git fetch` on the server as the `plasu` user (a read-only deploy key on
-the `plasu` account is the tidy option). A public repo needs nothing extra.
-
-When it finishes, open **http://80.241.214.47** and log in with
-`superadmin@plasu.edu.ng` / `Passw0rd!` — then **change every default password**
-(see the account list in the root `README.md`).
-
----
-
-## 2. Auto-deploy on `git push` (GitHub Actions)
-
-The workflow `.github/workflows/deploy.yml` builds the app on every push to
-`main`, then SSHes into the VPS and runs `deploy/deploy.sh`.
-
-### a. Create an SSH key for CI (on your laptop)
+A dedicated SSH keypair for CI has been generated. Add its **public** key to the
+`deploy` user:
 
 ```bash
-ssh-keygen -t ed25519 -f plasu_ci -N "" -C "github-actions"
+ssh deploy@80.241.214.47
+mkdir -p ~/.ssh && chmod 700 ~/.ssh
+echo 'ssh-ed25519 AAAA...github-actions-deploy' >> ~/.ssh/authorized_keys   # the public key
+chmod 600 ~/.ssh/authorized_keys
 ```
 
-### b. Authorise it on the server
+Then confirm the pm2 process matches the ecosystem file and persists across reboots:
 
 ```bash
-ssh root@80.241.214.47
-mkdir -p /home/plasu/.ssh && chmod 700 /home/plasu/.ssh
-cat >> /home/plasu/.ssh/authorized_keys   # paste the contents of plasu_ci.pub
-chown -R plasu:plasu /home/plasu/.ssh && chmod 600 /home/plasu/.ssh/authorized_keys
-usermod --shell /bin/bash plasu            # allow the CI session to run the script
+cd ~/plasu/plasu-inventory-deployed
+pm2 delete plasu-smis 2>/dev/null || true      # drop any earlier ad-hoc process
+pm2 start deploy/ecosystem.config.js
+pm2 save
+pm2 startup    # run the command it prints (uses sudo) so pm2 restarts on reboot
 ```
 
-### c. Add repo secrets (GitHub → Settings → Secrets and variables → Actions)
+### b. Add repo secrets
+
+GitHub → the **`plasu-inventory-deployed`** repo → Settings → Secrets and
+variables → Actions → *New repository secret*:
 
 | Secret | Value |
 |---|---|
 | `SSH_HOST` | `80.241.214.47` |
-| `SSH_USER` | `plasu` |
-| `SSH_PRIVATE_KEY` | full contents of the `plasu_ci` private key file |
-| `SSH_PORT` | `22` (optional) |
+| `SSH_USER` | `deploy` |
+| `SSH_PRIVATE_KEY` | the full CI **private** key, including the BEGIN/END lines |
+| `SSH_PORT` | *(optional)* `22` |
 
-Then just `git push origin main` — the Actions tab shows the deploy, and the
-script fails loudly if the health check (`/api/health`) doesn't pass.
+### c. Ship it
+
+```bash
+git push deployed main
+```
+
+Watch the run in the repo's **Actions** tab. The job fails loudly (and prints
+`pm2 logs`) if the health check doesn't pass after reload.
 
 ---
 
-## 3. Manual deploy / rollback
+## 2. Manual deploy / rollback
 
 ```bash
-ssh plasu@80.241.214.47 '/opt/plasu-smis/deploy/deploy.sh'          # deploy latest main
-# rollback to a known-good commit:
-ssh plasu@80.241.214.47 'cd /opt/plasu-smis && git reset --hard <sha> && deploy/deploy.sh'
+# deploy latest main
+ssh deploy@80.241.214.47 '~/plasu/plasu-inventory-deployed/deploy/deploy.sh'
+
+# roll back to a known-good commit
+ssh deploy@80.241.214.47 'cd ~/plasu/plasu-inventory-deployed && git reset --hard <sha> && ./deploy/deploy.sh'
 ```
 
 ---
 
-## 4. Operations cheat-sheet
+## 3. Operations cheat-sheet
 
 ```bash
-systemctl status plasu-smis           # is the API up?
-journalctl -u plasu-smis -f           # live API logs
-systemctl restart plasu-smis          # restart API
-nginx -t && systemctl reload nginx    # apply nginx changes
+pm2 status                       # is the API up?
+pm2 logs plasu-smis              # live API logs
+pm2 reload plasu-smis            # restart API (zero-downtime)
+sudo nginx -t && sudo systemctl reload nginx   # after editing the nginx site
 
-# Database lives here (survives deploys, git-ignored):
-/opt/plasu-smis/server/db/plasu_smis.sqlite
+# DB file (survives deploys, git-ignored):
+~/plasu/plasu-inventory-deployed/server/db/plasu_smis.sqlite
 ```
 
-### Backups
-
-The app exposes a one-click DB download for Super Admin / ICT Admin. For an
-automated nightly copy:
+### Nightly DB backup
 
 ```bash
-sudo tee /etc/cron.d/plasu-smis-backup >/dev/null <<'EOF'
-0 1 * * * plasu sqlite3 /opt/plasu-smis/server/db/plasu_smis.sqlite ".backup '/home/plasu/backup-$(date +\%F).sqlite'" && find /home/plasu -name 'backup-*.sqlite' -mtime +14 -delete
-EOF
+sudo apt install -y sqlite3
+( crontab -l 2>/dev/null; echo '0 1 * * * sqlite3 $HOME/plasu/plasu-inventory-deployed/server/db/plasu_smis.sqlite ".backup $HOME/backup-$(date +\%F).sqlite" && find $HOME -maxdepth 1 -name "backup-*.sqlite" -mtime +14 -delete' ) | crontab -
 ```
 
-(`apt install sqlite3` if the CLI isn't present.)
+The app also exposes a one-click DB download for Super Admin / ICT Admin.
 
 ---
 
-## 5. Adding a domain + HTTPS later
+## 4. Adding a domain + HTTPS later
 
 1. Point an A record at `80.241.214.47`.
-2. Edit `server_name` in `deploy/nginx/plasu-smis.conf` (and re-run a deploy) or
-   directly in `/etc/nginx/sites-available/plasu-smis`.
+2. Set `server_name` to the domain in `/etc/nginx/sites-available/plasu-smis`.
 3. `sudo apt install certbot python3-certbot-nginx && sudo certbot --nginx -d your-domain`
-4. Set `CLIENT_ORIGIN=https://your-domain` in `/opt/plasu-smis/server/.env` and
-   `systemctl restart plasu-smis`.
+4. Set `CLIENT_ORIGIN=https://your-domain` in `server/.env`, then `pm2 reload plasu-smis`.

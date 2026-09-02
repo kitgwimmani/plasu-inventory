@@ -39,4 +39,9 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script_stop: true
           command_timeout: 20m
-          script: /opt/plasu-smis/deploy/deploy.sh
+          script: |
+            set -e
+            APP_DIR="${HOME}/plasu/plasu-inventory-deployed"
+            git -C "$APP_DIR" fetch --prune origin
+            git -C "$APP_DIR" reset --hard origin/main
+            bash "$APP_DIR/deploy/deploy.sh"
