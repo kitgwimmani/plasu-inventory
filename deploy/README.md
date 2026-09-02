@@ -21,8 +21,8 @@ firewall, builds, and starts everything.
 
 ```bash
 ssh root@80.241.214.47
-git clone https://github.com/<you>/<repo>.git /opt/plasu-smis
-bash /opt/plasu-smis/deploy/setup.sh https://github.com/<you>/<repo>.git main
+git clone https://github.com/kitgwimmani/plasu-inventory-deployed.git /opt/plasu-smis
+bash /opt/plasu-smis/deploy/setup.sh https://github.com/kitgwimmani/plasu-inventory-deployed.git main
 ```
 
 For a **private** GitHub repo, first give the server read access — either a
