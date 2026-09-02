@@ -1,0 +1,25 @@
+[Unit]
+Description=PLASU SMIS API (Express + node:sqlite)
+After=network.target
+
+[Service]
+Type=simple
+User=plasu
+Group=plasu
+WorkingDirectory=/opt/plasu-smis/server
+EnvironmentFile=/opt/plasu-smis/server/.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=3
+# Give the API a moment on boot; node:sqlite runs migrations on start
+TimeoutStartSec=30
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/plasu-smis/server/db
+
+[Install]
+WantedBy=multi-user.target

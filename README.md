@@ -138,7 +138,16 @@ The green/gold color scheme is defined in `client/src/styles/theme.css`.
 
 ---
 
-## 5. Production Notes
+## 5. Deployment (Contabo VPS)
+
+To put this live on the server at `80.241.214.47` (nginx + systemd, auto-deploy
+on `git push`), follow **[`deploy/README.md`](deploy/README.md)**. In short:
+provision once with `deploy/setup.sh`, then every push to `main` triggers the
+GitHub Actions workflow, which runs `deploy/deploy.sh` on the server.
+
+---
+
+## 6. Production Notes
 - Swap `JWT_SECRET` for a long random value and store it outside source control.
 - Put the app behind HTTPS; set `CLIENT_ORIGIN` in `server/.env` to your real domain for CORS.
 - Back up `server/db/plasu_smis.sqlite` regularly, or migrate to a managed Postgres/MySQL
