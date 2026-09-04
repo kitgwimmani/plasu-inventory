@@ -26,11 +26,59 @@ const {
   checkLowStockAndNotify,
 } = require("../db/init");
 const { requireAuth, requireRole, hasRole } = require("../middleware/auth");
+const { sendMail } = require("../utils/mailer");
 
 const router = express.Router();
 router.use(requireAuth);
 
 const ADMIN_OVERRIDE = ["superadmin", "ictadmin"];
+
+const APP_URL = (process.env.CLIENT_ORIGIN || "http://localhost:3000").replace(/\/$/, "");
+
+// E-mail the requester about a decision on their requisition. No-op (logged only)
+// when SMTP is not configured — see utils/mailer.js.
+function emailRequester(reqId, subject, bodyLines) {
+  const row = db
+    .prepare(
+      `SELECT r.req_no, r.purpose, u.name AS hod_name, u.email AS hod_email
+       FROM requisitions r JOIN users u ON u.id = r.hod_id WHERE r.id = ?`
+    )
+    .get(reqId);
+  if (!row || !row.hod_email) return;
+  const link = `${APP_URL}/requisitions/${reqId}`;
+  const lines = [
+    `Dear ${row.hod_name},`,
+    "",
+    ...bodyLines,
+    "",
+    `Requisition: ${row.req_no}`,
+    `Purpose: ${row.purpose}`,
+    `View it here: ${link}`,
+    "",
+    "— PLASU Store Management Information System",
+  ];
+  sendMail({
+    to: row.hod_email,
+    subject: `${subject} — ${row.req_no}`,
+    text: lines.join("\n"),
+  });
+}
+
+// E-mail every active user holding one of the given roles.
+function emailRoles(roles, subject, bodyLines, reqId) {
+  const placeholders = roles.map(() => "?").join(",");
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT u.email FROM users u
+       JOIN user_roles ur ON ur.user_id = u.id
+       WHERE ur.role IN (${placeholders}) AND u.is_active = 1 AND u.email IS NOT NULL`
+    )
+    .all(...roles);
+  if (rows.length === 0) return;
+  const link = reqId ? `${APP_URL}/requisitions/${reqId}` : APP_URL;
+  const text = [...bodyLines, "", `Open: ${link}`, "", "— PLASU Store Management Information System"].join("\n");
+  for (const r of rows) sendMail({ to: r.email, subject, text });
+}
 
 function getFullRequisition(id) {
   const reqRow = db.prepare(
@@ -151,6 +199,9 @@ function finalizeApproval(reqId, actorId) {
     entity_type: "REQUISITION",
     entity_id: reqId,
   });
+  emailRequester(reqId, "Requisition approved", [
+    "Your requisition has been approved. It now awaits the Head of Store and Issuance Officer clearance signatures before the item(s) can be issued.",
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +402,15 @@ router.post("/", requireRole("hod"), (req, res) => {
     entity_type: "REQUISITION",
     entity_id: reqId,
   });
+  emailRoles(
+    ["head_of_store"],
+    `New requisition awaiting review — ${reqNo}`,
+    [
+      `${req.user.name} (${departmentName}) submitted a new requisition.`,
+      `Purpose: ${purpose}`,
+    ],
+    reqId
+  );
   res.status(201).json({ requisition: getFullRequisition(reqId) });
 });
 
@@ -418,6 +478,11 @@ router.put("/:id/recommend", requireRole("head_of_store"), (req, res) => {
     entity_type: "REQUISITION",
     entity_id: id,
   });
+  emailRequester(id, "Changes recommended on your requisition", [
+    "The Head of Store has recommended changes to the quantities on your requisition.",
+    `Remark: ${String(remark).trim()}`,
+    "Open the requisition to review the recommended quantities and accept them to approve it.",
+  ]);
   res.json({ requisition: getFullRequisition(id) });
 });
 
@@ -445,6 +510,10 @@ router.put("/:id/reject", requireRole("head_of_store"), (req, res) => {
     entity_type: "REQUISITION",
     entity_id: id,
   });
+  emailRequester(id, "Requisition rejected", [
+    "Your requisition has been rejected by the Head of Store.",
+    `Reason: ${String(reason).trim()}`,
+  ]);
   res.json({ requisition: getFullRequisition(id) });
 });
 
@@ -588,6 +657,10 @@ router.put("/:id/issue", requireRole("head_of_store", "issuance_officer", ...ADM
     entity_type: "REQUISITION",
     entity_id: id,
   });
+  emailRequester(id, "Requisition issued", [
+    "Your requisitioned item(s) have been issued from the Central Store.",
+    "You can print a collection receipt from the requisition page.",
+  ]);
   for (const line of lines) {
     if (line.item_id) checkLowStockAndNotify(line.item_id);
   }

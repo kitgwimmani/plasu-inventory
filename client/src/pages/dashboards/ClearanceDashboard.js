@@ -14,7 +14,7 @@ export default function ClearanceDashboard() {
   useEffect(() => {
     api
       .get("/dashboard")
-      .then((res) => setStats(res.data.stats))
+      .then((res) => setStats({ awaitingMyClearanceSignoff: [], ...res.data.stats }))
       .catch((err) => setError(err?.response?.data?.error || "Could not load dashboard."));
   }, []);
 

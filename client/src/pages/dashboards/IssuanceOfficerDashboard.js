@@ -12,7 +12,7 @@ export default function IssuanceOfficerDashboard() {
   useEffect(() => {
     api
       .get("/dashboard")
-      .then((res) => setStats(res.data.stats))
+      .then((res) => setStats({ awaitingMySignature: [], ...res.data.stats }))
       .catch((err) => setError(err?.response?.data?.error || "Could not load dashboard."));
   }, []);
 

@@ -13,7 +13,7 @@ export default function HodDashboard() {
   useEffect(() => {
     api
       .get("/dashboard")
-      .then((res) => setStats(res.data.stats))
+      .then((res) => setStats({ recentRequisitions: [], ...res.data.stats }))
       .catch((err) => setError(err?.response?.data?.error || "Could not load dashboard."));
   }, []);
 

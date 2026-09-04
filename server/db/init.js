@@ -881,4 +881,6 @@ module.exports = {
   notifyRoles,
   notifyUser,
   checkLowStockAndNotify,
+  seedIfEmpty,
+  backfillUserRoles,
 };
