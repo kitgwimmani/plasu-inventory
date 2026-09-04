@@ -7,6 +7,7 @@ import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
 import CategoryBadge from "../components/CategoryBadge";
+import SearchableSelect from "../components/SearchableSelect";
 
 const EMPTY_ITEM = {
   name: "",
@@ -92,6 +93,20 @@ export default function Inventory() {
   // Subcategories available for the currently chosen filter / form category.
   const subsForCategory = (catId) =>
     subcategories.filter((s) => !catId || String(s.category_id) === String(catId));
+
+  const categoryOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
+  const departmentOptions = departments.map((d) => ({ value: String(d.id), label: d.name }));
+  const subcategoryOptions = (catId) =>
+    subsForCategory(catId).map((s) => ({ value: String(s.id), label: s.name }));
+
+  // Lets Head of Store / admins create a missing subcategory inline, right from
+  // the item form, instead of leaving to the Categories page and back.
+  const createSubcategory = (catId) => async (name) => {
+    const res = await api.post(`/categories/${catId}/subcategories`, { name });
+    const sub = res.data.subcategory;
+    setSubcategories((prev) => [...prev, sub]);
+    return { value: String(sub.id), label: sub.name };
+  };
 
   const { page, setPage, pageSize, setPageSize, pageRows, total } = usePagination(items, 10);
 
@@ -266,29 +281,30 @@ export default function Inventory() {
           placeholder="Search by name, code or description…"
           filters={
             <>
-              <Form.Select
+              <SearchableSelect
                 size="sm"
-                value={categoryId}
-                onChange={(e) => { setCategoryId(e.target.value); setSubcategoryId(""); }}
                 style={{ width: 170 }}
-              >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Form.Select>
-              <Form.Select size="sm" value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} style={{ width: 170 }}>
-                <option value="">All Subcategories</option>
-                {subsForCategory(categoryId).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Form.Select>
-              <Form.Select size="sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: 170 }}>
-                <option value="">All Departments</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </Form.Select>
+                placeholder="All Categories"
+                value={categoryId}
+                onChange={(v) => { setCategoryId(v); setSubcategoryId(""); }}
+                options={categoryOptions}
+              />
+              <SearchableSelect
+                size="sm"
+                style={{ width: 170 }}
+                placeholder="All Subcategories"
+                value={subcategoryId}
+                onChange={setSubcategoryId}
+                options={subcategoryOptions(categoryId)}
+              />
+              <SearchableSelect
+                size="sm"
+                style={{ width: 170 }}
+                placeholder="All Departments"
+                value={departmentId}
+                onChange={setDepartmentId}
+                options={departmentOptions}
+              />
               <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 140 }}>
                 <option value="">All Statuses</option>
                 <option value="low">Low Stock</option>
@@ -370,39 +386,33 @@ export default function Inventory() {
               </Col>
               <Col md={6} className="mb-3">
                 <Form.Label>Category</Form.Label>
-                <Form.Select
-                  required
+                <SearchableSelect
+                  placeholder="-- Select category --"
                   value={newItem.category_id}
-                  onChange={(e) => setNewItem({ ...newItem, category_id: e.target.value, subcategory_id: "" })}
-                >
-                  <option value="">-- Select category --</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
-                  ))}
-                </Form.Select>
+                  onChange={(v) => setNewItem({ ...newItem, category_id: v, subcategory_id: "" })}
+                  options={categories.map((c) => ({ value: String(c.id), label: `${c.name} (${c.code})` }))}
+                />
                 <Form.Text muted>Item code is generated automatically from the category, e.g. "STA-0004".</Form.Text>
               </Col>
               <Col md={6} className="mb-3">
                 <Form.Label>Subcategory (optional)</Form.Label>
-                <Form.Select
-                  value={newItem.subcategory_id}
+                <SearchableSelect
+                  placeholder={newItem.category_id ? "-- None --" : "-- Select a category first --"}
                   disabled={!newItem.category_id}
-                  onChange={(e) => setNewItem({ ...newItem, subcategory_id: e.target.value })}
-                >
-                  <option value="">-- None --</option>
-                  {subsForCategory(newItem.category_id).map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </Form.Select>
+                  value={newItem.subcategory_id}
+                  onChange={(v) => setNewItem({ ...newItem, subcategory_id: v })}
+                  options={subcategoryOptions(newItem.category_id)}
+                  onCreate={newItem.category_id ? createSubcategory(newItem.category_id) : undefined}
+                />
               </Col>
               <Col md={6} className="mb-3">
                 <Form.Label>Department (optional)</Form.Label>
-                <Form.Select value={newItem.department_id} onChange={(e) => setNewItem({ ...newItem, department_id: e.target.value })}>
-                  <option value="">-- None --</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Form.Select>
+                <SearchableSelect
+                  placeholder="-- None --"
+                  value={newItem.department_id}
+                  onChange={(v) => setNewItem({ ...newItem, department_id: v })}
+                  options={departmentOptions}
+                />
               </Col>
               <Col md={12} className="mb-3">
                 <Form.Label>Description</Form.Label>
@@ -489,36 +499,31 @@ export default function Inventory() {
                   </Col>
                   <Col md={6} className="mb-3">
                     <Form.Label>Category</Form.Label>
-                    <Form.Select
+                    <SearchableSelect
                       value={editForm.category_id}
-                      onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value, subcategory_id: "" })}
-                    >
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
-                      ))}
-                    </Form.Select>
+                      onChange={(v) => setEditForm({ ...editForm, category_id: v, subcategory_id: "" })}
+                      options={categories.map((c) => ({ value: String(c.id), label: `${c.name} (${c.code})` }))}
+                    />
                   </Col>
                   <Col md={6} className="mb-3">
                     <Form.Label>Subcategory (optional)</Form.Label>
-                    <Form.Select
-                      value={editForm.subcategory_id}
+                    <SearchableSelect
+                      placeholder={editForm.category_id ? "-- None --" : "-- Select a category first --"}
                       disabled={!editForm.category_id}
-                      onChange={(e) => setEditForm({ ...editForm, subcategory_id: e.target.value })}
-                    >
-                      <option value="">-- None --</option>
-                      {subsForCategory(editForm.category_id).map((s) => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </Form.Select>
+                      value={editForm.subcategory_id}
+                      onChange={(v) => setEditForm({ ...editForm, subcategory_id: v })}
+                      options={subcategoryOptions(editForm.category_id)}
+                      onCreate={editForm.category_id ? createSubcategory(editForm.category_id) : undefined}
+                    />
                   </Col>
                   <Col md={6} className="mb-3">
                     <Form.Label>Department (optional)</Form.Label>
-                    <Form.Select value={editForm.department_id} onChange={(e) => setEditForm({ ...editForm, department_id: e.target.value })}>
-                      <option value="">-- None --</option>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </Form.Select>
+                    <SearchableSelect
+                      placeholder="-- None --"
+                      value={editForm.department_id}
+                      onChange={(v) => setEditForm({ ...editForm, department_id: v })}
+                      options={departmentOptions}
+                    />
                   </Col>
                   <Col md={12} className="mb-3">
                     <Form.Label>Description</Form.Label>

@@ -6,6 +6,7 @@ import { ROLE_LABELS } from "../context/AuthContext";
 import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
+import SearchableSelect from "../components/SearchableSelect";
 
 const EMPTY_FORM = { name: "", email: "", password: "", roles: ["hod"], department_id: "" };
 
@@ -262,12 +263,12 @@ export default function Users() {
               </Col>
               <Col md={6} className="mb-3">
                 <Form.Label>Department / Unit</Form.Label>
-                <Form.Select value={form.department_id} onChange={(e) => setForm({ ...form, department_id: e.target.value })}>
-                  <option value="">-- None --</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Form.Select>
+                <SearchableSelect
+                  placeholder="-- None --"
+                  value={form.department_id}
+                  onChange={(v) => setForm({ ...form, department_id: v })}
+                  options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+                />
               </Col>
             </Row>
           </Modal.Body>

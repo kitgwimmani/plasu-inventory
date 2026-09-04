@@ -14,6 +14,7 @@ import InventoryReportPrint from "../components/print/InventoryReportPrint";
 import RequisitionsReportPrint from "../components/print/RequisitionsReportPrint";
 import { presetLabel, presetToRange } from "../utils/dateRanges";
 import { formatDate } from "../utils/formatDate";
+import SearchableSelect from "../components/SearchableSelect";
 
 function InventoryReportTab({ user }) {
   const [categories, setCategories] = useState([]);
@@ -37,6 +38,9 @@ function InventoryReportTab({ user }) {
   }, []);
 
   const subsForCategory = subcategories.filter((s) => !categoryId || String(s.category_id) === String(categoryId));
+  const categoryOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
+  const subcategoryOptions = subsForCategory.map((s) => ({ value: String(s.id), label: s.name }));
+  const departmentOptions = departments.map((d) => ({ value: String(d.id), label: d.name }));
 
   const load = useCallback(() => {
     setLoading(true);
@@ -99,29 +103,30 @@ function InventoryReportTab({ user }) {
           placeholder="Search by item name or code…"
           filters={
             <>
-              <Form.Select
+              <SearchableSelect
                 size="sm"
-                value={categoryId}
-                onChange={(e) => { setCategoryId(e.target.value); setSubcategoryId(""); }}
                 style={{ width: 160 }}
-              >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Form.Select>
-              <Form.Select size="sm" value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} style={{ width: 160 }}>
-                <option value="">All Subcategories</option>
-                {subsForCategory.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Form.Select>
-              <Form.Select size="sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: 160 }}>
-                <option value="">All Departments</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </Form.Select>
+                placeholder="All Categories"
+                value={categoryId}
+                onChange={(v) => { setCategoryId(v); setSubcategoryId(""); }}
+                options={categoryOptions}
+              />
+              <SearchableSelect
+                size="sm"
+                style={{ width: 160 }}
+                placeholder="All Subcategories"
+                value={subcategoryId}
+                onChange={setSubcategoryId}
+                options={subcategoryOptions}
+              />
+              <SearchableSelect
+                size="sm"
+                style={{ width: 160 }}
+                placeholder="All Departments"
+                value={departmentId}
+                onChange={setDepartmentId}
+                options={departmentOptions}
+              />
               <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 140 }}>
                 <option value="">All Statuses</option>
                 <option value="low">Low Stock</option>
@@ -222,6 +227,10 @@ function RequisitionsReportTab({ user }) {
   }, []);
 
   const subsForCategory = subcategories.filter((s) => !categoryId || String(s.category_id) === String(categoryId));
+  const categoryOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
+  const subcategoryOptions = subsForCategory.map((s) => ({ value: String(s.id), label: s.name }));
+  const departmentOptions = departments.map((d) => ({ value: String(d.id), label: d.name }));
+  const hodOptions = hods.map((h) => ({ value: String(h.id), label: h.name }));
 
   const load = useCallback(() => {
     setLoading(true);
@@ -313,37 +322,40 @@ function RequisitionsReportTab({ user }) {
                 <option value="issued">Issued</option>
                 <option value="rejected">Rejected</option>
               </Form.Select>
-              <Form.Select
+              <SearchableSelect
                 size="sm"
-                value={categoryId}
-                onChange={(e) => { setCategoryId(e.target.value); setSubcategoryId(""); }}
                 style={{ width: 160 }}
-              >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Form.Select>
-              <Form.Select size="sm" value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} style={{ width: 160 }}>
-                <option value="">All Subcategories</option>
-                {subsForCategory.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Form.Select>
+                placeholder="All Categories"
+                value={categoryId}
+                onChange={(v) => { setCategoryId(v); setSubcategoryId(""); }}
+                options={categoryOptions}
+              />
+              <SearchableSelect
+                size="sm"
+                style={{ width: 160 }}
+                placeholder="All Subcategories"
+                value={subcategoryId}
+                onChange={setSubcategoryId}
+                options={subcategoryOptions}
+              />
               {canSeeAll && (
                 <>
-                  <Form.Select size="sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: 170 }}>
-                    <option value="">All Departments</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </Form.Select>
-                  <Form.Select size="sm" value={hodId} onChange={(e) => setHodId(e.target.value)} style={{ width: 170 }}>
-                    <option value="">All Requesters</option>
-                    {hods.map((h) => (
-                      <option key={h.id} value={h.id}>{h.name}</option>
-                    ))}
-                  </Form.Select>
+                  <SearchableSelect
+                    size="sm"
+                    style={{ width: 170 }}
+                    placeholder="All Departments"
+                    value={departmentId}
+                    onChange={setDepartmentId}
+                    options={departmentOptions}
+                  />
+                  <SearchableSelect
+                    size="sm"
+                    style={{ width: 170 }}
+                    placeholder="All Requesters"
+                    value={hodId}
+                    onChange={setHodId}
+                    options={hodOptions}
+                  />
                 </>
               )}
             </>

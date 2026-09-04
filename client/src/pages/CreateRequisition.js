@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Card, Form, Button, Alert, Table, Row, Col, ButtonGroup, Badge } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import SearchableSelect from "../components/SearchableSelect";
 
 const EMPTY_ADHOC = {
   adhoc_name: "",
@@ -46,6 +47,15 @@ export default function CreateRequisition() {
   const baseQtyPreview = currentPackaging && packQty ? Number(packQty) * currentPackaging.units_per_pack : 0;
   const subsForCategory = (catId) =>
     subcategories.filter((s) => !catId || String(s.category_id) === String(catId));
+  const departmentOptions = departments.map((d) => ({ value: String(d.id), label: d.name }));
+  const categoryOptions = categories.map((c) => ({ value: String(c.id), label: c.name }));
+  const subcategoryOptions = (catId) =>
+    subsForCategory(catId).map((s) => ({ value: String(s.id), label: s.name }));
+  const itemOptions = items.map((i) => ({
+    value: String(i.id),
+    label: `${i.code} — ${i.name} (${i.quantity_on_hand} ${i.unit} available)`,
+    disabled: i.quantity_on_hand <= 0,
+  }));
 
   const handleSelectItem = (id) => {
     setSelectedItem(id);
@@ -179,12 +189,12 @@ export default function CreateRequisition() {
           </Col>
           <Col md={4} className="mb-3">
             <Form.Label>Department</Form.Label>
-            <Form.Select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
-              <option value="">-- My department --</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </Form.Select>
+            <SearchableSelect
+              placeholder="-- My department --"
+              value={departmentId}
+              onChange={setDepartmentId}
+              options={departmentOptions}
+            />
           </Col>
         </Row>
 
@@ -209,14 +219,12 @@ export default function CreateRequisition() {
           <Row className="align-items-end g-2">
             <Col md={4}>
               <Form.Label>Item</Form.Label>
-              <Form.Select value={selectedItem} onChange={(e) => handleSelectItem(e.target.value)}>
-                <option value="">-- Select an item --</option>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id} disabled={i.quantity_on_hand <= 0}>
-                    {i.code} — {i.name} ({i.quantity_on_hand} {i.unit} available)
-                  </option>
-                ))}
-              </Form.Select>
+              <SearchableSelect
+                placeholder="-- Select an item --"
+                value={selectedItem}
+                onChange={handleSelectItem}
+                options={itemOptions}
+              />
             </Col>
             <Col md={3}>
               <Form.Label>Packaging</Form.Label>
@@ -260,37 +268,31 @@ export default function CreateRequisition() {
             </Col>
             <Col md={4}>
               <Form.Label>Category (optional)</Form.Label>
-              <Form.Select
+              <SearchableSelect
+                placeholder="-- None --"
                 value={adhoc.adhoc_category_id}
-                onChange={(e) => setAdhoc({ ...adhoc, adhoc_category_id: e.target.value, adhoc_subcategory_id: "" })}
-              >
-                <option value="">-- None --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Form.Select>
+                onChange={(v) => setAdhoc({ ...adhoc, adhoc_category_id: v, adhoc_subcategory_id: "" })}
+                options={categoryOptions}
+              />
             </Col>
             <Col md={4}>
               <Form.Label>Subcategory (optional)</Form.Label>
-              <Form.Select
-                value={adhoc.adhoc_subcategory_id}
+              <SearchableSelect
+                placeholder={adhoc.adhoc_category_id ? "-- None --" : "-- Select a category first --"}
                 disabled={!adhoc.adhoc_category_id}
-                onChange={(e) => setAdhoc({ ...adhoc, adhoc_subcategory_id: e.target.value })}
-              >
-                <option value="">-- None --</option>
-                {subsForCategory(adhoc.adhoc_category_id).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Form.Select>
+                value={adhoc.adhoc_subcategory_id}
+                onChange={(v) => setAdhoc({ ...adhoc, adhoc_subcategory_id: v })}
+                options={subcategoryOptions(adhoc.adhoc_category_id)}
+              />
             </Col>
             <Col md={4}>
               <Form.Label>Department (optional)</Form.Label>
-              <Form.Select value={adhoc.adhoc_department_id} onChange={(e) => setAdhoc({ ...adhoc, adhoc_department_id: e.target.value })}>
-                <option value="">-- None --</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </Form.Select>
+              <SearchableSelect
+                placeholder="-- None --"
+                value={adhoc.adhoc_department_id}
+                onChange={(v) => setAdhoc({ ...adhoc, adhoc_department_id: v })}
+                options={departmentOptions}
+              />
             </Col>
             <Col md={12}>
               <Form.Label>Description (optional)</Form.Label>

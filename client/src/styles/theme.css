@@ -451,3 +451,83 @@ body {
     padding: 0.5in;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* SearchableSelect — type-to-filter combobox used in place of long <select>s */
+/* ---------------------------------------------------------------------- */
+.searchable-select {
+  position: relative;
+}
+.searchable-select-control {
+  position: relative;
+}
+.searchable-select-control input {
+  padding-right: 2.25rem;
+}
+.searchable-select-caret {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6c757d;
+  font-size: 0.7rem;
+  pointer-events: none;
+}
+.searchable-select-clear {
+  position: absolute;
+  right: 1.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.15rem;
+}
+.searchable-select-clear:hover {
+  color: #212529;
+}
+.searchable-select-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 3050;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  padding: 0.25rem 0;
+}
+.searchable-select-option {
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.searchable-select-option.is-highlighted {
+  background: #eef6ef;
+}
+.searchable-select-option.is-selected {
+  font-weight: 600;
+  color: #0f6b2c;
+}
+.searchable-select-option.is-disabled {
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+.searchable-select-create {
+  color: #0f6b2c;
+  font-weight: 500;
+  border-top: 1px solid #eee;
+}
+.searchable-select-empty {
+  padding: 0.5rem 0.75rem;
+  color: #6c757d;
+  font-size: 0.85rem;
+}

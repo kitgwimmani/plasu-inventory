@@ -9,6 +9,7 @@ import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
 import { presetToRange } from "../utils/dateRanges";
 import { formatDate } from "../utils/formatDate";
+import SearchableSelect from "../components/SearchableSelect";
 
 export default function Requisitions() {
   const { user } = useAuth();
@@ -83,12 +84,14 @@ export default function Requisitions() {
                 <option value="rejected">Rejected</option>
               </Form.Select>
               {canSeeAll && (
-                <Form.Select size="sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: 180 }}>
-                  <option value="">All Departments</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Form.Select>
+                <SearchableSelect
+                  size="sm"
+                  style={{ width: 180 }}
+                  placeholder="All Departments"
+                  value={departmentId}
+                  onChange={setDepartmentId}
+                  options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+                />
               )}
             </>
           }
