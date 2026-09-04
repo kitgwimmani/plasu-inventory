@@ -2,13 +2,22 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Card, Table, Button, Modal, Form, Alert, Badge, Row, Col, OverlayTrigger, Tooltip, Spinner } from "react-bootstrap";
 import { useSearchParams } from "react-router-dom";
 import api from "../api/axios";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, hasRole } from "../context/AuthContext";
 import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
 import CategoryBadge from "../components/CategoryBadge";
 
-const EMPTY_ITEM = { name: "", description: "", unit: "piece", category_id: "", quantity_on_hand: 0, reorder_level: 0 };
+const EMPTY_ITEM = {
+  name: "",
+  description: "",
+  unit: "piece",
+  category_id: "",
+  subcategory_id: "",
+  department_id: "",
+  quantity_on_hand: 0,
+  reorder_level: 0,
+};
 const EMPTY_PACKAGING_ROW = () => ({ key: Math.random().toString(36).slice(2), label: "", units_per_pack: "" });
 
 function BestFit({ item }) {
@@ -25,14 +34,18 @@ function BestFit({ item }) {
 
 export default function Inventory() {
   const { user } = useAuth();
-  const canAddItems = user.role === "superadmin" || user.role === "ictadmin";
-  const canReceiveStock = user.role === "inventoryadmin" || canAddItems;
+  const canAddItems = hasRole(user, "superadmin", "ictadmin", "head_of_store");
+  const canReceiveStock = hasRole(user, "head_of_store", "superadmin", "ictadmin");
 
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [status, setStatus] = useState(searchParams.get("status") || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -59,6 +72,8 @@ export default function Inventory() {
     const params = {};
     if (q) params.q = q;
     if (categoryId) params.category_id = categoryId;
+    if (subcategoryId) params.subcategory_id = subcategoryId;
+    if (departmentId) params.department_id = departmentId;
     if (status) params.status = status;
     api
       .get("/items", { params })
@@ -67,10 +82,16 @@ export default function Inventory() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(load, [q, categoryId, status]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(load, [q, categoryId, subcategoryId, departmentId, status]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     api.get("/categories").then((res) => setCategories(res.data.categories)).catch(() => {});
+    api.get("/categories/subcategories/all").then((res) => setSubcategories(res.data.subcategories)).catch(() => {});
+    api.get("/departments").then((res) => setDepartments(res.data.departments)).catch(() => {});
   }, []);
+
+  // Subcategories available for the currently chosen filter / form category.
+  const subsForCategory = (catId) =>
+    subcategories.filter((s) => !catId || String(s.category_id) === String(catId));
 
   const { page, setPage, pageSize, setPageSize, pageRows, total } = usePagination(items, 10);
 
@@ -107,6 +128,8 @@ export default function Inventory() {
       description: item.description || "",
       unit: item.unit,
       category_id: item.category_id || "",
+      subcategory_id: item.subcategory_id || "",
+      department_id: item.department_id || "",
       reorder_level: item.reorder_level,
       is_active: item.is_active,
     });
@@ -243,13 +266,30 @@ export default function Inventory() {
           placeholder="Search by name, code or description…"
           filters={
             <>
-              <Form.Select size="sm" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ width: 180 }}>
+              <Form.Select
+                size="sm"
+                value={categoryId}
+                onChange={(e) => { setCategoryId(e.target.value); setSubcategoryId(""); }}
+                style={{ width: 170 }}
+              >
                 <option value="">All Categories</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Form.Select>
-              <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 150 }}>
+              <Form.Select size="sm" value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} style={{ width: 170 }}>
+                <option value="">All Subcategories</option>
+                {subsForCategory(categoryId).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Form.Select>
+              <Form.Select size="sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: 170 }}>
+                <option value="">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Form.Select>
+              <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 140 }}>
                 <option value="">All Statuses</option>
                 <option value="low">Low Stock</option>
                 <option value="healthy">Healthy</option>
@@ -268,6 +308,8 @@ export default function Inventory() {
                   <th>Code</th>
                   <th>Name</th>
                   <th>Category</th>
+                  <th>Subcategory</th>
+                  <th>Department</th>
                   <th>On Hand</th>
                   <th>Reorder Level</th>
                   <th>Status</th>
@@ -280,6 +322,8 @@ export default function Inventory() {
                     <td>{i.code}</td>
                     <td>{i.name}<div className="text-muted small">{i.description}</div></td>
                     <td><CategoryBadge name={i.category_name} code={i.category_code} /></td>
+                    <td className="small">{i.subcategory_name || "—"}</td>
+                    <td className="small">{i.department_name || "—"}</td>
                     <td><BestFit item={i} /></td>
                     <td>{i.reorder_level} {i.unit}</td>
                     <td>
@@ -304,7 +348,7 @@ export default function Inventory() {
                   </tr>
                 ))}
                 {pageRows.length === 0 && (
-                  <tr><td colSpan={7} className="text-center text-muted">No items match the selected filters.</td></tr>
+                  <tr><td colSpan={9} className="text-center text-muted">No items match the selected filters.</td></tr>
                 )}
               </tbody>
             </Table>
@@ -326,13 +370,39 @@ export default function Inventory() {
               </Col>
               <Col md={6} className="mb-3">
                 <Form.Label>Category</Form.Label>
-                <Form.Select required value={newItem.category_id} onChange={(e) => setNewItem({ ...newItem, category_id: e.target.value })}>
+                <Form.Select
+                  required
+                  value={newItem.category_id}
+                  onChange={(e) => setNewItem({ ...newItem, category_id: e.target.value, subcategory_id: "" })}
+                >
                   <option value="">-- Select category --</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
                   ))}
                 </Form.Select>
                 <Form.Text muted>Item code is generated automatically from the category, e.g. "STA-0004".</Form.Text>
+              </Col>
+              <Col md={6} className="mb-3">
+                <Form.Label>Subcategory (optional)</Form.Label>
+                <Form.Select
+                  value={newItem.subcategory_id}
+                  disabled={!newItem.category_id}
+                  onChange={(e) => setNewItem({ ...newItem, subcategory_id: e.target.value })}
+                >
+                  <option value="">-- None --</option>
+                  {subsForCategory(newItem.category_id).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </Form.Select>
+              </Col>
+              <Col md={6} className="mb-3">
+                <Form.Label>Department (optional)</Form.Label>
+                <Form.Select value={newItem.department_id} onChange={(e) => setNewItem({ ...newItem, department_id: e.target.value })}>
+                  <option value="">-- None --</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </Form.Select>
               </Col>
               <Col md={12} className="mb-3">
                 <Form.Label>Description</Form.Label>
@@ -419,9 +489,34 @@ export default function Inventory() {
                   </Col>
                   <Col md={6} className="mb-3">
                     <Form.Label>Category</Form.Label>
-                    <Form.Select value={editForm.category_id} onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value })}>
+                    <Form.Select
+                      value={editForm.category_id}
+                      onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value, subcategory_id: "" })}
+                    >
                       {categories.map((c) => (
                         <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                  <Col md={6} className="mb-3">
+                    <Form.Label>Subcategory (optional)</Form.Label>
+                    <Form.Select
+                      value={editForm.subcategory_id}
+                      disabled={!editForm.category_id}
+                      onChange={(e) => setEditForm({ ...editForm, subcategory_id: e.target.value })}
+                    >
+                      <option value="">-- None --</option>
+                      {subsForCategory(editForm.category_id).map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </Form.Select>
+                  </Col>
+                  <Col md={6} className="mb-3">
+                    <Form.Label>Department (optional)</Form.Label>
+                    <Form.Select value={editForm.department_id} onChange={(e) => setEditForm({ ...editForm, department_id: e.target.value })}>
+                      <option value="">-- None --</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </Form.Select>
                   </Col>

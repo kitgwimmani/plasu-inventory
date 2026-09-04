@@ -1,33 +1,43 @@
 // routes/reports.js
-// Flexible, filterable data for the printable Reports page: inventory status,
-// and requisitions (which can be sliced into "by department" / "by person" /
-// "by status" summaries, and any date range / day / month / year window) —
-// all driven by the same query-building block so every report honors the same
-// filters consistently. The client renders the actual printable HTML (with
-// letterhead + watermark); this endpoint just returns clean, filtered data.
+// Flexible, filterable data for the printable Reports page: inventory status and
+// requisitions. The client renders the actual printable HTML (letterhead +
+// watermark); this endpoint returns clean, filtered data + summaries.
 const express = require("express");
-const { db, SIGNOFF_ROLES } = require("../db/init");
-const { requireAuth } = require("../middleware/auth");
+const { db } = require("../db/init");
+const { requireAuth, hasRole } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
 
 router.get("/inventory", (req, res) => {
-  const { q, category_id, status } = req.query;
+  const { q, category_id, subcategory_id, department_id, status } = req.query;
   let sql = `
-    SELECT i.*, c.name AS category_name, c.code AS category_code
-    FROM items i LEFT JOIN categories c ON c.id = i.category_id
+    SELECT i.*, c.name AS category_name, c.code AS category_code,
+           s.name AS subcategory_name, s.code AS subcategory_code,
+           d.name AS department_name
+    FROM items i
+    LEFT JOIN categories c ON c.id = i.category_id
+    LEFT JOIN subcategories s ON s.id = i.subcategory_id
+    LEFT JOIN departments d ON d.id = i.department_id
     WHERE i.is_active = 1`;
   const params = [];
   if (category_id) {
     sql += " AND i.category_id = ?";
     params.push(category_id);
   }
+  if (subcategory_id) {
+    sql += " AND i.subcategory_id = ?";
+    params.push(subcategory_id);
+  }
+  if (department_id) {
+    sql += " AND i.department_id = ?";
+    params.push(department_id);
+  }
   if (q) {
     sql += " AND (i.name LIKE ? OR i.code LIKE ?)";
     params.push(`%${q}%`, `%${q}%`);
   }
-  sql += " ORDER BY c.name ASC, i.name ASC";
+  sql += " ORDER BY c.name ASC, s.name ASC, i.name ASC";
 
   let items = db.prepare(sql).all(...params);
   if (status === "low") items = items.filter((i) => i.quantity_on_hand <= i.reorder_level);
@@ -41,33 +51,30 @@ router.get("/inventory", (req, res) => {
     totalOnHandLines: items.length,
     lowStockCount: items.filter((i) => i.quantity_on_hand <= i.reorder_level).length,
     byCategory: {},
+    bySubcategory: {},
+    byDepartment: {},
   };
   for (const i of items) {
-    const key = i.category_name || "Uncategorized";
-    summary.byCategory[key] = (summary.byCategory[key] || 0) + 1;
+    const cat = i.category_name || "Uncategorized";
+    summary.byCategory[cat] = (summary.byCategory[cat] || 0) + 1;
+    if (i.subcategory_name) summary.bySubcategory[i.subcategory_name] = (summary.bySubcategory[i.subcategory_name] || 0) + 1;
+    if (i.department_name) summary.byDepartment[i.department_name] = (summary.byDepartment[i.department_name] || 0) + 1;
   }
 
   res.json({ items, summary, generated_at: new Date().toISOString() });
 });
 
 function buildRequisitionFilter(req) {
-  const { status, department_id, date_from, date_to, q } = req.query;
-  let hodId = req.query.hod_id;
+  const { status, department_id, category_id, subcategory_id, date_from, date_to, q } = req.query;
+  const hodId = req.query.hod_id;
 
   let where = "WHERE 1=1";
   const params = [];
-  let extraJoin = "";
 
-  if (req.user.role === "hod") {
+  // A requester who is only an HOD sees their own; broader roles see everything.
+  if (hasRole(req.user, "hod") && !hasRole(req.user, "superadmin", "ictadmin", "head_of_store", "issuance_officer")) {
     where += " AND r.hod_id = ?";
     params.push(req.user.id);
-  } else if (SIGNOFF_ROLES.includes(req.user.role) && req.user.role !== "requester") {
-    extraJoin = " JOIN signoffs sf ON sf.requisition_id = r.id AND sf.role_label = ? ";
-    params.unshift(req.user.role);
-    if (hodId) {
-      where += " AND r.hod_id = ?";
-      params.push(hodId);
-    }
   } else if (hodId) {
     where += " AND r.hod_id = ?";
     params.push(hodId);
@@ -80,6 +87,16 @@ function buildRequisitionFilter(req) {
   if (department_id) {
     where += " AND r.department_id = ?";
     params.push(department_id);
+  }
+  if (category_id) {
+    where += ` AND EXISTS (SELECT 1 FROM requisition_items ri JOIN items i ON i.id = ri.item_id
+               WHERE ri.requisition_id = r.id AND i.category_id = ?)`;
+    params.push(category_id);
+  }
+  if (subcategory_id) {
+    where += ` AND EXISTS (SELECT 1 FROM requisition_items ri JOIN items i ON i.id = ri.item_id
+               WHERE ri.requisition_id = r.id AND i.subcategory_id = ?)`;
+    params.push(subcategory_id);
   }
   if (date_from) {
     where += " AND r.created_at >= ?";
@@ -94,11 +111,11 @@ function buildRequisitionFilter(req) {
     params.push(`%${q}%`, `%${q}%`);
   }
 
-  return { where, params, extraJoin };
+  return { where, params };
 }
 
 router.get("/requisitions", (req, res) => {
-  const { where, params, extraJoin } = buildRequisitionFilter(req);
+  const { where, params } = buildRequisitionFilter(req);
 
   const rows = db
     .prepare(
@@ -106,25 +123,22 @@ router.get("/requisitions", (req, res) => {
        FROM requisitions r
        JOIN users u ON u.id = r.hod_id
        LEFT JOIN departments d ON d.id = r.department_id
-       ${extraJoin}
        ${where}
        ORDER BY r.created_at DESC`
     )
     .all(...params);
 
   const lineStmt = db.prepare(
-    `SELECT ri.*, i.code AS item_code, i.name AS item_name, i.unit
-     FROM requisition_items ri JOIN items i ON i.id = ri.item_id
+    `SELECT ri.*,
+            COALESCE(i.code, '—') AS item_code,
+            COALESCE(i.name, ri.adhoc_name) AS item_name,
+            COALESCE(i.unit, ri.adhoc_unit) AS unit
+     FROM requisition_items ri LEFT JOIN items i ON i.id = ri.item_id
      WHERE ri.requisition_id = ?`
   );
   const withLines = rows.map((r) => ({ ...r, lines: lineStmt.all(r.id) }));
 
-  const summary = {
-    totalCount: rows.length,
-    byStatus: {},
-    byDepartment: {},
-    byPerson: {},
-  };
+  const summary = { totalCount: rows.length, byStatus: {}, byDepartment: {}, byPerson: {} };
   for (const r of rows) {
     summary.byStatus[r.status] = (summary.byStatus[r.status] || 0) + 1;
     const deptKey = r.department_name_current || r.department || "Unspecified";

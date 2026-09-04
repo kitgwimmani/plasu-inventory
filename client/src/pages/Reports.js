@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, Tabs, Tab, Row, Form, Button, Table, Alert, Spinner } from "react-bootstrap";
 import { Link } from "react-router-dom";
 import api from "../api/axios";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, hasRole, FULL_ACCESS_ROLES } from "../context/AuthContext";
 import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
@@ -15,12 +15,14 @@ import RequisitionsReportPrint from "../components/print/RequisitionsReportPrint
 import { presetLabel, presetToRange } from "../utils/dateRanges";
 import { formatDate } from "../utils/formatDate";
 
-const FULL_ACCESS_ROLES = ["superadmin", "ictadmin", "inventoryadmin"];
-
 function InventoryReportTab({ user }) {
   const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [status, setStatus] = useState("");
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -30,13 +32,19 @@ function InventoryReportTab({ user }) {
 
   useEffect(() => {
     api.get("/categories").then((res) => setCategories(res.data.categories)).catch(() => {});
+    api.get("/categories/subcategories/all").then((res) => setSubcategories(res.data.subcategories)).catch(() => {});
+    api.get("/departments").then((res) => setDepartments(res.data.departments)).catch(() => {});
   }, []);
+
+  const subsForCategory = subcategories.filter((s) => !categoryId || String(s.category_id) === String(categoryId));
 
   const load = useCallback(() => {
     setLoading(true);
     const params = {};
     if (q) params.q = q;
     if (categoryId) params.category_id = categoryId;
+    if (subcategoryId) params.subcategory_id = subcategoryId;
+    if (departmentId) params.department_id = departmentId;
     if (status) params.status = status;
     api
       .get("/reports/inventory", { params })
@@ -47,7 +55,7 @@ function InventoryReportTab({ user }) {
       })
       .catch((err) => setError(err?.response?.data?.error || "Could not load inventory report."))
       .finally(() => setLoading(false));
-  }, [q, categoryId, status]);
+  }, [q, categoryId, subcategoryId, departmentId, status]);
 
   useEffect(load, [load]);
 
@@ -59,10 +67,18 @@ function InventoryReportTab({ user }) {
       const c = categories.find((c) => String(c.id) === String(categoryId));
       if (c) parts.push(`Category: ${c.name}`);
     }
+    if (subcategoryId) {
+      const s = subcategories.find((s) => String(s.id) === String(subcategoryId));
+      if (s) parts.push(`Subcategory: ${s.name}`);
+    }
+    if (departmentId) {
+      const d = departments.find((d) => String(d.id) === String(departmentId));
+      if (d) parts.push(`Department: ${d.name}`);
+    }
     if (status) parts.push(`Status: ${status === "low" ? "Low Stock" : "Healthy"}`);
     if (q) parts.push(`Search: "${q}"`);
     return parts.length ? parts.join(" · ") : "All active inventory items";
-  }, [categoryId, status, q, categories]);
+  }, [categoryId, subcategoryId, departmentId, status, q, categories, subcategories, departments]);
 
   return (
     <>
@@ -83,13 +99,30 @@ function InventoryReportTab({ user }) {
           placeholder="Search by item name or code…"
           filters={
             <>
-              <Form.Select size="sm" value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={{ width: 180 }}>
+              <Form.Select
+                size="sm"
+                value={categoryId}
+                onChange={(e) => { setCategoryId(e.target.value); setSubcategoryId(""); }}
+                style={{ width: 160 }}
+              >
                 <option value="">All Categories</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </Form.Select>
-              <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 160 }}>
+              <Form.Select size="sm" value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} style={{ width: 160 }}>
+                <option value="">All Subcategories</option>
+                {subsForCategory.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Form.Select>
+              <Form.Select size="sm" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: 160 }}>
+                <option value="">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Form.Select>
+              <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 140 }}>
                 <option value="">All Statuses</option>
                 <option value="low">Low Stock</option>
                 <option value="healthy">Healthy</option>
@@ -158,12 +191,16 @@ function InventoryReportTab({ user }) {
 }
 
 function RequisitionsReportTab({ user }) {
-  const canSeeAll = FULL_ACCESS_ROLES.includes(user.role);
+  const canSeeAll = hasRole(user, ...FULL_ACCESS_ROLES);
   const [departments, setDepartments] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
   const [hods, setHods] = useState([]);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
   const [departmentId, setDepartmentId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [subcategoryId, setSubcategoryId] = useState("");
   const [hodId, setHodId] = useState("");
   const [preset, setPreset] = useState("all");
   const [customFrom, setCustomFrom] = useState("");
@@ -176,11 +213,15 @@ function RequisitionsReportTab({ user }) {
 
   useEffect(() => {
     api.get("/departments").then((res) => setDepartments(res.data.departments)).catch(() => {});
+    api.get("/categories").then((res) => setCategories(res.data.categories)).catch(() => {});
+    api.get("/categories/subcategories/all").then((res) => setSubcategories(res.data.subcategories)).catch(() => {});
     if (canSeeAll) {
       api.get("/users/hods").then((res) => setHods(res.data.users)).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const subsForCategory = subcategories.filter((s) => !categoryId || String(s.category_id) === String(categoryId));
 
   const load = useCallback(() => {
     setLoading(true);
@@ -188,6 +229,8 @@ function RequisitionsReportTab({ user }) {
     const params = { ...range };
     if (q) params.q = q;
     if (status) params.status = status;
+    if (categoryId) params.category_id = categoryId;
+    if (subcategoryId) params.subcategory_id = subcategoryId;
     if (canSeeAll && departmentId) params.department_id = departmentId;
     if (canSeeAll && hodId) params.hod_id = hodId;
     api
@@ -199,7 +242,7 @@ function RequisitionsReportTab({ user }) {
       })
       .catch((err) => setError(err?.response?.data?.error || "Could not load requisitions report."))
       .finally(() => setLoading(false));
-  }, [q, status, departmentId, hodId, preset, customFrom, customTo, canSeeAll]);
+  }, [q, status, categoryId, subcategoryId, departmentId, hodId, preset, customFrom, customTo, canSeeAll]);
 
   useEffect(load, [load]);
 
@@ -216,9 +259,17 @@ function RequisitionsReportTab({ user }) {
       const h = hods.find((h) => String(h.id) === String(hodId));
       if (h) parts.push(`Requester: ${h.name}`);
     }
+    if (categoryId) {
+      const c = categories.find((c) => String(c.id) === String(categoryId));
+      if (c) parts.push(`Category: ${c.name}`);
+    }
+    if (subcategoryId) {
+      const s = subcategories.find((s) => String(s.id) === String(subcategoryId));
+      if (s) parts.push(`Subcategory: ${s.name}`);
+    }
     if (q) parts.push(`Search: "${q}"`);
     return parts.join(" · ");
-  }, [preset, status, departmentId, hodId, q, departments, hods, canSeeAll]);
+  }, [preset, status, categoryId, subcategoryId, departmentId, hodId, q, categories, subcategories, departments, hods, canSeeAll]);
 
   return (
     <>
@@ -256,10 +307,28 @@ function RequisitionsReportTab({ user }) {
               )}
               <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 150 }}>
                 <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
+                <option value="pending">Pending Review</option>
+                <option value="recommended">Recommended</option>
                 <option value="approved">Approved</option>
                 <option value="issued">Issued</option>
                 <option value="rejected">Rejected</option>
+              </Form.Select>
+              <Form.Select
+                size="sm"
+                value={categoryId}
+                onChange={(e) => { setCategoryId(e.target.value); setSubcategoryId(""); }}
+                style={{ width: 160 }}
+              >
+                <option value="">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Form.Select>
+              <Form.Select size="sm" value={subcategoryId} onChange={(e) => setSubcategoryId(e.target.value)} style={{ width: 160 }}>
+                <option value="">All Subcategories</option>
+                {subsForCategory.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
               </Form.Select>
               {canSeeAll && (
                 <>

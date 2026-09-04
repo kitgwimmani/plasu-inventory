@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, hasRole } from "../context/AuthContext";
 import { Spinner } from "react-bootstrap";
 
 // Wrap any route that requires authentication. Optionally pass `roles`
@@ -20,7 +20,7 @@ export default function ProtectedRoute({ children, roles }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (roles && !roles.includes(user.role)) {
+  if (roles && !hasRole(user, ...roles)) {
     return <Navigate to="/dashboard" replace />;
   }
 

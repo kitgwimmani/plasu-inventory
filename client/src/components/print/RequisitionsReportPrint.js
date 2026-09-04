@@ -78,7 +78,7 @@ export default function RequisitionsReportPrint({ requisitions, summary, filters
         </tbody>
       </Table>
 
-      <SignatureBlock labels={["Prepared By (Inventory Admin)", "Verified By (Internal Audit)", "Approved By (Registrar/ICT Admin)"]} />
+      <SignatureBlock labels={["Prepared By (Head of Store)", "Verified By (Issuance Officer)", "Approved By (Registrar/ICT Admin)"]} />
     </div>
   );
 }

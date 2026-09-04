@@ -3,18 +3,17 @@ import { Card, Table, Button, Alert, Form } from "react-bootstrap";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../api/axios";
 import StatusBadge from "../components/StatusBadge";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, hasRole, FULL_ACCESS_ROLES } from "../context/AuthContext";
 import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
 import { presetToRange } from "../utils/dateRanges";
 import { formatDate } from "../utils/formatDate";
 
-const FULL_ACCESS_ROLES = ["superadmin", "ictadmin", "inventoryadmin"];
-
 export default function Requisitions() {
   const { user } = useAuth();
-  const canSeeAll = FULL_ACCESS_ROLES.includes(user.role);
+  const canSeeAll = hasRole(user, ...FULL_ACCESS_ROLES);
+  const isRequester = hasRole(user, "hod") && !canSeeAll;
   const [searchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -51,10 +50,10 @@ export default function Requisitions() {
         <div>
           <h4 className="mb-0">Requisitions</h4>
           <p className="text-muted mb-0">
-            {user.role === "hod" ? "Your requisitions and their approval status." : "All requisitions raised across departments."}
+            {isRequester ? "Your requisitions and their approval status." : "All requisitions raised across departments."}
           </p>
         </div>
-        {user.role === "hod" && (
+        {hasRole(user, "hod") && (
           <Button as={Link} to="/requisitions/new" className="btn-plasu"><i className="bi bi-plus-lg me-1" />New Requisition</Button>
         )}
       </div>
@@ -77,7 +76,8 @@ export default function Requisitions() {
               </Form.Select>
               <Form.Select size="sm" value={status} onChange={(e) => setStatus(e.target.value)} style={{ width: 150 }}>
                 <option value="">All Statuses</option>
-                <option value="pending">Pending</option>
+                <option value="pending">Pending Review</option>
+                <option value="recommended">Recommended</option>
                 <option value="approved">Approved</option>
                 <option value="issued">Issued</option>
                 <option value="rejected">Rejected</option>

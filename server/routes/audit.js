@@ -7,7 +7,14 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get("/", requireRole("superadmin", "ictadmin"), (req, res) => {
-  const logs = db.prepare("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 300").all();
+  const logs = db
+    .prepare(
+      `SELECT a.*, u.name AS actor_name
+       FROM audit_logs a
+       LEFT JOIN users u ON u.id = a.actor_id
+       ORDER BY a.id DESC LIMIT 300`
+    )
+    .all();
   res.json({ logs });
 });
 

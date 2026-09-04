@@ -10,7 +10,7 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const { DatabaseSync } = require("node:sqlite");
 
-const DB_PATH = path.join(__dirname, "plasu_smis.sqlite");
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, "plasu_smis.sqlite");
 const raw = new DatabaseSync(DB_PATH);
 raw.exec("PRAGMA foreign_keys = ON");
 
@@ -47,19 +47,52 @@ const db = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
+// A user can now hold SEVERAL roles at once (stored in the user_roles table).
+// `users.role` is kept as the single "primary" role — derived from ROLE_PRIORITY
+// — and drives dashboard routing, display and the code-sequence helpers.
 const ROLES = [
   "superadmin",
   "ictadmin",
   "hod",
-  "inventoryadmin",
+  "head_of_store",
+  "issuance_officer",
   "technical_expert",
   "audit_officer",
   "asset_officer",
 ];
-const SIGNOFF_ROLES = ["requester", "technical_expert", "audit_officer", "asset_officer"];
-// Roles that are allowed to manage master data (categories, departments, items) and
-// receive back-office notifications (low stock, new submissions, etc).
-const BACKOFFICE_ROLES = ["superadmin", "ictadmin", "inventoryadmin"];
+const ROLE_CHECK_SQL = `CHECK(role IN ('superadmin','ictadmin','hod','head_of_store','issuance_officer','technical_expert','audit_officer','asset_officer'))`;
+
+// Requisition clearance signatories, in signing order: the Head of Store signs
+// first, then the Issuance Officer.
+const SIGNOFF_ROLES = ["head_of_store", "issuance_officer"];
+// Stock-receipt clearance signatories — the only workflow action these three
+// roles perform (besides viewing/printing inventory).
+const CLEARANCE_ROLES = ["technical_expert", "audit_officer", "asset_officer"];
+// Roles that manage master data (categories, subcategories, items) and receive
+// back-office notifications (low stock, new submissions, etc).
+const BACKOFFICE_ROLES = ["superadmin", "ictadmin", "head_of_store"];
+// Highest-privilege-first ordering used to pick a user's primary role.
+const ROLE_PRIORITY = [
+  "superadmin",
+  "ictadmin",
+  "head_of_store",
+  "issuance_officer",
+  "hod",
+  "technical_expert",
+  "audit_officer",
+  "asset_officer",
+];
+
+function primaryRole(roles) {
+  const list = Array.isArray(roles) ? roles : [roles];
+  for (const r of ROLE_PRIORITY) {
+    if (list.includes(r)) return r;
+  }
+  return list[0] || "hod";
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -69,6 +102,9 @@ function nowIso() {
 // Small schema-migration helpers: SQLite lets us ADD COLUMN freely (as long as
 // it doesn't need to be NOT NULL without a default), so most upgrades to an
 // existing installation can be applied in-place without rebuilding tables.
+// For the changes SQLite can't do in place (altering a CHECK constraint,
+// dropping NOT NULL) rebuildTable() follows SQLite's recommended
+// create-new / copy / drop-old / rename procedure.
 // ---------------------------------------------------------------------------
 function columnExists(table, column) {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all();
@@ -79,7 +115,49 @@ function ensureColumn(table, column, ddl) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
   }
 }
+function tableSql(name) {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
+    .get(name);
+  return row ? row.sql : null;
+}
+function tableExists(name) {
+  return !!tableSql(name);
+}
 
+// Rebuild `name` with a fresh column definition. `columnsDdl` is the text that
+// goes between the parentheses of CREATE TABLE. By default the intersecting
+// columns are copied across from the old table.
+function rebuildTable(name, columnsDdl, { copyData = true, selectExpr = {} } = {}) {
+  raw.exec("PRAGMA foreign_keys=OFF");
+  raw.exec("BEGIN");
+  try {
+    raw.exec(`CREATE TABLE __new_${name} (${columnsDdl})`);
+    if (copyData) {
+      const newCols = db.prepare(`PRAGMA table_info(__new_${name})`).all().map((c) => c.name);
+      const oldCols = db.prepare(`PRAGMA table_info(${name})`).all().map((c) => c.name);
+      const shared = newCols.filter((c) => oldCols.includes(c));
+      if (shared.length) {
+        const selectList = shared.map((c) => (selectExpr[c] ? `${selectExpr[c]} AS ${c}` : c));
+        raw.exec(
+          `INSERT INTO __new_${name} (${shared.join(",")}) SELECT ${selectList.join(",")} FROM ${name}`
+        );
+      }
+    }
+    raw.exec(`DROP TABLE ${name}`);
+    raw.exec(`ALTER TABLE __new_${name} RENAME TO ${name}`);
+    raw.exec("COMMIT");
+  } catch (err) {
+    raw.exec("ROLLBACK");
+    raw.exec("PRAGMA foreign_keys=ON");
+    throw err;
+  }
+  raw.exec("PRAGMA foreign_keys=ON");
+}
+
+// ---------------------------------------------------------------------------
+// Schema
+// ---------------------------------------------------------------------------
 function initSchema() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS departments (
@@ -105,17 +183,45 @@ function initSchema() {
       FOREIGN KEY(created_by) REFERENCES users(id)
     );
 
+    CREATE TABLE IF NOT EXISTS subcategories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      code TEXT NOT NULL UNIQUE,
+      description TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_by INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT,
+      UNIQUE(category_id, name),
+      FOREIGN KEY(category_id) REFERENCES categories(id),
+      FOREIGN KEY(created_by) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
-      role TEXT NOT NULL CHECK(role IN ('superadmin','ictadmin','hod','inventoryadmin','technical_expert','audit_officer','asset_officer')),
+      role TEXT NOT NULL ${ROLE_CHECK_SQL},
       department TEXT,
+      department_id INTEGER,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_by INTEGER,
       created_at TEXT NOT NULL,
-      FOREIGN KEY(created_by) REFERENCES users(id)
+      updated_at TEXT,
+      updated_by INTEGER,
+      FOREIGN KEY(created_by) REFERENCES users(id),
+      FOREIGN KEY(department_id) REFERENCES departments(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS user_roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      role TEXT NOT NULL ${ROLE_CHECK_SQL},
+      created_at TEXT NOT NULL,
+      UNIQUE(user_id, role),
+      FOREIGN KEY(user_id) REFERENCES users(id)
     );
 
     CREATE TABLE IF NOT EXISTS items (
@@ -126,9 +232,17 @@ function initSchema() {
       unit TEXT NOT NULL DEFAULT 'ea',
       quantity_on_hand REAL NOT NULL DEFAULT 0,
       reorder_level REAL NOT NULL DEFAULT 0,
+      category_id INTEGER,
+      subcategory_id INTEGER,
+      department_id INTEGER,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_by INTEGER NOT NULL,
       created_at TEXT NOT NULL,
+      updated_at TEXT,
+      updated_by INTEGER,
+      FOREIGN KEY(category_id) REFERENCES categories(id),
+      FOREIGN KEY(subcategory_id) REFERENCES subcategories(id),
+      FOREIGN KEY(department_id) REFERENCES departments(id),
       FOREIGN KEY(created_by) REFERENCES users(id)
     );
 
@@ -147,11 +261,15 @@ function initSchema() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       item_id INTEGER NOT NULL,
       qty REAL NOT NULL CHECK(qty > 0),
+      packaging_id INTEGER,
+      pack_qty REAL,
       remarks TEXT,
       received_by INTEGER NOT NULL,
+      clearance_request_id INTEGER,
       created_at TEXT NOT NULL,
       FOREIGN KEY(item_id) REFERENCES items(id),
-      FOREIGN KEY(received_by) REFERENCES users(id)
+      FOREIGN KEY(received_by) REFERENCES users(id),
+      FOREIGN KEY(clearance_request_id) REFERENCES clearance_requests(id)
     );
 
     CREATE TABLE IF NOT EXISTS requisitions (
@@ -159,9 +277,15 @@ function initSchema() {
       req_no TEXT NOT NULL UNIQUE,
       hod_id INTEGER NOT NULL,
       department TEXT NOT NULL,
+      department_id INTEGER,
       purpose TEXT NOT NULL,
-      status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected','issued')) DEFAULT 'pending',
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK(status IN ('pending','recommended','approved','rejected','issued')),
       created_at TEXT NOT NULL,
+      recommended_by INTEGER,
+      recommended_at TEXT,
+      recommendation_remark TEXT,
+      accepted_at TEXT,
       approved_by INTEGER,
       approved_at TEXT,
       rejected_by INTEGER,
@@ -170,6 +294,8 @@ function initSchema() {
       issued_by INTEGER,
       issued_at TEXT,
       FOREIGN KEY(hod_id) REFERENCES users(id),
+      FOREIGN KEY(department_id) REFERENCES departments(id),
+      FOREIGN KEY(recommended_by) REFERENCES users(id),
       FOREIGN KEY(approved_by) REFERENCES users(id),
       FOREIGN KEY(rejected_by) REFERENCES users(id),
       FOREIGN KEY(issued_by) REFERENCES users(id)
@@ -178,22 +304,61 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS requisition_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       requisition_id INTEGER NOT NULL,
-      item_id INTEGER NOT NULL,
+      item_id INTEGER,
       qty_requested REAL NOT NULL CHECK(qty_requested > 0),
+      qty_recommended REAL,
       remarks TEXT,
+      packaging_id INTEGER,
+      pack_qty REAL,
+      is_adhoc INTEGER NOT NULL DEFAULT 0,
+      adhoc_name TEXT,
+      adhoc_description TEXT,
+      adhoc_unit TEXT,
+      adhoc_category_id INTEGER,
+      adhoc_subcategory_id INTEGER,
+      adhoc_department_id INTEGER,
       FOREIGN KEY(requisition_id) REFERENCES requisitions(id),
-      FOREIGN KEY(item_id) REFERENCES items(id)
+      FOREIGN KEY(item_id) REFERENCES items(id),
+      FOREIGN KEY(packaging_id) REFERENCES item_packagings(id),
+      FOREIGN KEY(adhoc_category_id) REFERENCES categories(id),
+      FOREIGN KEY(adhoc_subcategory_id) REFERENCES subcategories(id),
+      FOREIGN KEY(adhoc_department_id) REFERENCES departments(id)
     );
 
     CREATE TABLE IF NOT EXISTS signoffs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       requisition_id INTEGER NOT NULL,
-      role_label TEXT NOT NULL CHECK(role_label IN ('requester','technical_expert','audit_officer','asset_officer')),
+      role_label TEXT NOT NULL CHECK(role_label IN ('head_of_store','issuance_officer')),
       signed INTEGER NOT NULL DEFAULT 0,
       signed_by_name TEXT,
       signed_at TEXT,
       UNIQUE(requisition_id, role_label),
       FOREIGN KEY(requisition_id) REFERENCES requisitions(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS clearance_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ref_no TEXT NOT NULL UNIQUE,
+      date_from TEXT NOT NULL,
+      date_to TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','cleared')),
+      remark TEXT,
+      created_by INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      cleared_at TEXT,
+      FOREIGN KEY(created_by) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS clearance_signoffs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clearance_request_id INTEGER NOT NULL,
+      role_label TEXT NOT NULL CHECK(role_label IN ('technical_expert','audit_officer','asset_officer')),
+      signed INTEGER NOT NULL DEFAULT 0,
+      signed_by_name TEXT,
+      signed_at TEXT,
+      remark TEXT,
+      UNIQUE(clearance_request_id, role_label),
+      FOREIGN KEY(clearance_request_id) REFERENCES clearance_requests(id)
     );
 
     CREATE TABLE IF NOT EXISTS audit_logs (
@@ -222,8 +387,10 @@ function initSchema() {
     );
   `);
 
-  // ---- In-place upgrades for installs created before this feature set existed ----
+  // ---- Additive in-place upgrades for older installs ----
   ensureColumn("items", "category_id", "category_id INTEGER REFERENCES categories(id)");
+  ensureColumn("items", "subcategory_id", "subcategory_id INTEGER REFERENCES subcategories(id)");
+  ensureColumn("items", "department_id", "department_id INTEGER REFERENCES departments(id)");
   ensureColumn("items", "updated_at", "updated_at TEXT");
   ensureColumn("items", "updated_by", "updated_by INTEGER REFERENCES users(id)");
 
@@ -232,16 +399,147 @@ function initSchema() {
   ensureColumn("users", "updated_by", "updated_by INTEGER REFERENCES users(id)");
 
   ensureColumn("requisitions", "department_id", "department_id INTEGER REFERENCES departments(id)");
-
   ensureColumn("requisition_items", "packaging_id", "packaging_id INTEGER REFERENCES item_packagings(id)");
   ensureColumn("requisition_items", "pack_qty", "pack_qty REAL");
-
   ensureColumn("stock_receipts", "packaging_id", "packaging_id INTEGER REFERENCES item_packagings(id)");
   ensureColumn("stock_receipts", "pack_qty", "pack_qty REAL");
+  ensureColumn("stock_receipts", "clearance_request_id", "clearance_request_id INTEGER REFERENCES clearance_requests(id)");
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_items_subcategory ON items(subcategory_id);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_requisitions_dept ON requisitions(department_id);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_stock_receipts_clearance ON stock_receipts(clearance_request_id);`);
+}
+
+// ---------------------------------------------------------------------------
+// Migrations for installs created before the role/workflow overhaul.
+// ---------------------------------------------------------------------------
+function backfillUserRoles() {
+  const missing = db
+    .prepare(
+      `SELECT u.id, u.role FROM users u
+       WHERE NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id)`
+    )
+    .all();
+  const ins = db.prepare(
+    "INSERT OR IGNORE INTO user_roles(user_id, role, created_at) VALUES (?,?,?)"
+  );
+  for (const u of missing) ins.run(u.id, u.role, nowIso());
+}
+
+function migrateSchema() {
+  // 1. users: widen the role CHECK to the new role set and rename the legacy
+  //    "inventoryadmin" role to "head_of_store".
+  const usersSql = tableSql("users");
+  if (usersSql && !usersSql.includes("head_of_store")) {
+    console.log("Migrating users table for the Head of Store / multi-role model...");
+    rebuildTable(
+      "users",
+      `id INTEGER PRIMARY KEY AUTOINCREMENT,
+       name TEXT NOT NULL,
+       email TEXT NOT NULL UNIQUE,
+       password_hash TEXT NOT NULL,
+       role TEXT NOT NULL ${ROLE_CHECK_SQL},
+       department TEXT,
+       department_id INTEGER REFERENCES departments(id),
+       is_active INTEGER NOT NULL DEFAULT 1,
+       created_by INTEGER REFERENCES users(id),
+       created_at TEXT NOT NULL,
+       updated_at TEXT,
+       updated_by INTEGER REFERENCES users(id)`,
+      { selectExpr: { role: "CASE WHEN role='inventoryadmin' THEN 'head_of_store' ELSE role END" } }
+    );
+  }
+
+  // 2. user_roles: backfill from users.role, then rename legacy role values.
+  if (tableExists("user_roles")) {
+    backfillUserRoles();
+    try {
+      db.exec("UPDATE user_roles SET role='head_of_store' WHERE role='inventoryadmin'");
+    } catch (err) {
+      /* CHECK on a rebuilt table already rejects the legacy value — nothing to do */
+    }
+  }
+
+  // 3. requisitions: add the 'recommended' status + recommendation columns.
+  const reqSql = tableSql("requisitions");
+  if (reqSql && !reqSql.includes("'recommended'")) {
+    console.log("Migrating requisitions table for the recommend/accept workflow...");
+    rebuildTable(
+      "requisitions",
+      `id INTEGER PRIMARY KEY AUTOINCREMENT,
+       req_no TEXT NOT NULL UNIQUE,
+       hod_id INTEGER NOT NULL REFERENCES users(id),
+       department TEXT NOT NULL,
+       department_id INTEGER REFERENCES departments(id),
+       purpose TEXT NOT NULL,
+       status TEXT NOT NULL DEFAULT 'pending'
+         CHECK(status IN ('pending','recommended','approved','rejected','issued')),
+       created_at TEXT NOT NULL,
+       recommended_by INTEGER REFERENCES users(id),
+       recommended_at TEXT,
+       recommendation_remark TEXT,
+       accepted_at TEXT,
+       approved_by INTEGER REFERENCES users(id),
+       approved_at TEXT,
+       rejected_by INTEGER REFERENCES users(id),
+       rejected_at TEXT,
+       rejection_reason TEXT,
+       issued_by INTEGER REFERENCES users(id),
+       issued_at TEXT`
+    );
+  }
+
+  // 4. requisition_items: make item_id nullable + add adhoc / recommended cols.
+  if (tableExists("requisition_items") && !columnExists("requisition_items", "is_adhoc")) {
+    console.log("Migrating requisition_items table for ad-hoc (new) item requests...");
+    rebuildTable(
+      "requisition_items",
+      `id INTEGER PRIMARY KEY AUTOINCREMENT,
+       requisition_id INTEGER NOT NULL REFERENCES requisitions(id),
+       item_id INTEGER REFERENCES items(id),
+       qty_requested REAL NOT NULL CHECK(qty_requested > 0),
+       qty_recommended REAL,
+       remarks TEXT,
+       packaging_id INTEGER REFERENCES item_packagings(id),
+       pack_qty REAL,
+       is_adhoc INTEGER NOT NULL DEFAULT 0,
+       adhoc_name TEXT,
+       adhoc_description TEXT,
+       adhoc_unit TEXT,
+       adhoc_category_id INTEGER REFERENCES categories(id),
+       adhoc_subcategory_id INTEGER REFERENCES subcategories(id),
+       adhoc_department_id INTEGER REFERENCES departments(id)`
+    );
+  }
+
+  // 5. signoffs: the clearance sheet is now just Head of Store + Issuance Officer.
+  //    Legacy rows (requester/technical/audit/asset) can't satisfy the new CHECK,
+  //    so drop them and re-seed empty slots for any still-open approved requisition.
+  const signoffSql = tableSql("signoffs");
+  if (signoffSql && signoffSql.includes("'requester'")) {
+    console.log("Migrating signoffs table to the 2-party requisition clearance...");
+    rebuildTable(
+      "signoffs",
+      `id INTEGER PRIMARY KEY AUTOINCREMENT,
+       requisition_id INTEGER NOT NULL REFERENCES requisitions(id),
+       role_label TEXT NOT NULL CHECK(role_label IN ('head_of_store','issuance_officer')),
+       signed INTEGER NOT NULL DEFAULT 0,
+       signed_by_name TEXT,
+       signed_at TEXT,
+       UNIQUE(requisition_id, role_label)`,
+      { copyData: false }
+    );
+    const openApproved = db.prepare("SELECT id FROM requisitions WHERE status='approved'").all();
+    const insSlot = db.prepare(
+      "INSERT OR IGNORE INTO signoffs(requisition_id, role_label, signed) VALUES (?,?,0)"
+    );
+    for (const r of openApproved) {
+      for (const label of SIGNOFF_ROLES) insSlot.run(r.id, label);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +552,15 @@ function nextReqNo() {
     .get(`PLASU-SRV-${year}-%`);
   const next = (row.c || 0) + 1;
   return `PLASU-SRV-${year}-${String(next).padStart(4, "0")}`;
+}
+
+function nextClearanceRef() {
+  const year = new Date().getFullYear();
+  const row = db
+    .prepare(`SELECT COUNT(*) AS c FROM clearance_requests WHERE ref_no LIKE ?`)
+    .get(`PLASU-CLR-${year}-%`);
+  const next = (row.c || 0) + 1;
+  return `PLASU-CLR-${year}-${String(next).padStart(4, "0")}`;
 }
 
 // Item IDs are always system-generated, never typed in by a user. The prefix
@@ -299,6 +606,47 @@ function nextCategoryCode(name) {
   return candidate;
 }
 
+// Subcategory codes are namespaced under their category prefix, e.g. "STA-PEN".
+function nextSubcategoryCode(categoryId, name) {
+  const cat = categoryId ? db.prepare("SELECT code FROM categories WHERE id = ?").get(categoryId) : null;
+  const prefix = (cat && cat.code) ? cat.code : "GEN";
+  const base = String(name || "SUB")
+    .replace(/[^a-zA-Z]/g, "")
+    .slice(0, 3)
+    .toUpperCase() || "SUB";
+  let candidate = `${prefix}-${base}`;
+  let i = 1;
+  while (db.prepare("SELECT id FROM subcategories WHERE code = ?").get(candidate)) {
+    i += 1;
+    candidate = `${prefix}-${base}${i}`;
+  }
+  return candidate;
+}
+
+// ---------------------------------------------------------------------------
+// User-role helpers
+// ---------------------------------------------------------------------------
+function rolesForUser(userId) {
+  return db
+    .prepare("SELECT role FROM user_roles WHERE user_id = ? ORDER BY id")
+    .all(userId)
+    .map((r) => r.role);
+}
+
+// Replace a user's full role set and recompute their primary `users.role`.
+function setUserRoles(userId, roles) {
+  const clean = [...new Set((roles || []).filter((r) => ROLES.includes(r)))];
+  if (clean.length === 0) throw new Error("A user must have at least one role.");
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM user_roles WHERE user_id = ?").run(userId);
+    const ins = db.prepare("INSERT INTO user_roles(user_id, role, created_at) VALUES (?,?,?)");
+    for (const r of clean) ins.run(userId, r, nowIso());
+    db.prepare("UPDATE users SET role = ? WHERE id = ?").run(primaryRole(clean), userId);
+  });
+  tx();
+  return clean;
+}
+
 function audit(actorId, actorEmail, action, entityType, entityId, details) {
   db.prepare(
     `INSERT INTO audit_logs(actor_id, actor_email, action, entity_type, entity_id, details, created_at)
@@ -307,9 +655,7 @@ function audit(actorId, actorEmail, action, entityType, entityId, details) {
 }
 
 // ---------------------------------------------------------------------------
-// Notifications: fanned out one row per recipient so unread counts / bell
-// badges are a simple, fast per-user query. notifyRoles() is a convenience
-// wrapper that resolves a role (or list of roles) to active user ids.
+// Notifications
 // ---------------------------------------------------------------------------
 function notifyUsers(userIds, { type, title, message, entity_type, entity_id }) {
   const uniqueIds = [...new Set((userIds || []).filter(Boolean))];
@@ -328,7 +674,11 @@ function notifyRoles(roles, payload) {
   const roleList = Array.isArray(roles) ? roles : [roles];
   const placeholders = roleList.map(() => "?").join(",");
   const rows = db
-    .prepare(`SELECT id FROM users WHERE role IN (${placeholders}) AND is_active = 1`)
+    .prepare(
+      `SELECT DISTINCT u.id FROM users u
+       JOIN user_roles ur ON ur.user_id = u.id
+       WHERE ur.role IN (${placeholders}) AND u.is_active = 1`
+    )
     .all(...roleList);
   notifyUsers(rows.map((r) => r.id), payload);
 }
@@ -337,13 +687,11 @@ function notifyUser(userId, payload) {
   notifyUsers([userId], payload);
 }
 
-// Checks an item's stock level after any change and pings back-office roles
-// if it has fallen at or below its reorder level.
 function checkLowStockAndNotify(itemId) {
   const item = db.prepare("SELECT * FROM items WHERE id = ?").get(itemId);
   if (!item || !item.is_active) return;
   if (item.quantity_on_hand <= item.reorder_level) {
-    notifyRoles(["superadmin", "ictadmin", "inventoryadmin"], {
+    notifyRoles(BACKOFFICE_ROLES, {
       type: "low_stock",
       title: `Low stock: ${item.name}`,
       message: `${item.name} (${item.code}) is at ${item.quantity_on_hand} ${item.unit}, at or below the reorder level of ${item.reorder_level}.`,
@@ -353,40 +701,8 @@ function checkLowStockAndNotify(itemId) {
   }
 }
 
-function migrateUsersTableIfNeeded() {
-  // Existing installs created before the technical_expert/audit_officer/asset_officer
-  // roles existed have a stricter CHECK constraint baked into the users table.
-  // SQLite can't ALTER a CHECK constraint directly, so rebuild the table if needed.
-  const row = db
-    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
-    .get();
-  if (row && row.sql && !row.sql.includes("technical_expert")) {
-    console.log("Migrating users table to support new clearance-signatory roles...");
-    db.exec(`
-      ALTER TABLE users RENAME TO users_old;
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL CHECK(role IN ('superadmin','ictadmin','hod','inventoryadmin','technical_expert','audit_officer','asset_officer')),
-        department TEXT,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_by INTEGER,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY(created_by) REFERENCES users(id)
-      );
-      INSERT INTO users(id, name, email, password_hash, role, department, is_active, created_by, created_at)
-        SELECT id, name, email, password_hash, role, department, is_active, created_by, created_at FROM users_old;
-      DROP TABLE users_old;
-    `);
-    console.log("Migration complete.");
-  }
-}
-
 // Backfills department_id on users/requisitions from the legacy free-text
-// `department` column, creating department master records as needed so
-// nothing existing breaks when the relational departments table is introduced.
+// `department` column, creating department master records as needed.
 function migrateDepartmentsFromText() {
   const distinctUserDepts = db
     .prepare("SELECT DISTINCT department FROM users WHERE department IS NOT NULL AND TRIM(department) != '' AND department_id IS NULL")
@@ -421,17 +737,19 @@ function seedIfEmpty() {
     insert.run("System Super Admin", "superadmin@plasu.edu.ng", hash, "superadmin", "ICT/Admin", nowIso());
     insert.run("ICT Admin", "ictadmin@plasu.edu.ng", hash, "ictadmin", "ICT Unit", nowIso());
     insert.run("HOD Computer Science", "hod.cs@plasu.edu.ng", hash, "hod", "Computer Science", nowIso());
-    insert.run("Inventory Admin", "inventoryadmin@plasu.edu.ng", hash, "inventoryadmin", "Central Store", nowIso());
+    insert.run("Head of Store", "headofstore@plasu.edu.ng", hash, "head_of_store", "Central Store", nowIso());
+    insert.run("Issuance Officer", "issuance@plasu.edu.ng", hash, "issuance_officer", "Central Store", nowIso());
     insert.run("Technical Expert", "technical@plasu.edu.ng", hash, "technical_expert", "Works/Technical Unit", nowIso());
     insert.run("Audit Officer", "audit@plasu.edu.ng", hash, "audit_officer", "Internal Audit Unit", nowIso());
     insert.run("Asset & Insurance Officer", "asset@plasu.edu.ng", hash, "asset_officer", "Asset Management Unit", nowIso());
-    console.log(`Seeded 7 default users. Default password for all: ${defaultPassword}`);
+    console.log(`Seeded 8 default users. Default password for all: ${defaultPassword}`);
   }
 
-  // Backfill the 3 new signatory accounts for installs that already had users
-  // seeded before these roles existed.
+  // Backfill accounts for installs seeded before a role existed.
   const defaultPassword = "Passw0rd!";
   const newAccounts = [
+    ["Head of Store", "headofstore@plasu.edu.ng", "head_of_store", "Central Store"],
+    ["Issuance Officer", "issuance@plasu.edu.ng", "issuance_officer", "Central Store"],
     ["Technical Expert", "technical@plasu.edu.ng", "technical_expert", "Works/Technical Unit"],
     ["Audit Officer", "audit@plasu.edu.ng", "audit_officer", "Internal Audit Unit"],
     ["Asset & Insurance Officer", "asset@plasu.edu.ng", "asset_officer", "Asset Management Unit"],
@@ -448,7 +766,7 @@ function seedIfEmpty() {
     }
   }
 
-  // Seed default item categories (admin can add more / edit these later).
+  // Seed default item categories.
   const categoryCount = db.prepare("SELECT COUNT(*) AS c FROM categories").get().c;
   if (categoryCount === 0) {
     const superadmin = db.prepare("SELECT id FROM users WHERE role='superadmin'").get();
@@ -464,8 +782,6 @@ function seedIfEmpty() {
     console.log("Seeded default item categories.");
   }
 
-  // Seed a starter department list; migrateDepartmentsFromText() will add any
-  // others discovered from existing user/requisition records.
   const deptCount = db.prepare("SELECT COUNT(*) AS c FROM departments").get().c;
   if (deptCount === 0) {
     const insertDept = db.prepare(
@@ -511,10 +827,9 @@ function seedIfEmpty() {
       insertPkg.run(boxFile.lastInsertRowid, "Single Piece", 1, 1, nowIso());
       insertPkg.run(boxFile.lastInsertRowid, "Pack of 10", 10, 0, nowIso());
 
-      console.log("Seeded 4 sample inventory items with packaging tiers (e.g. pencil: single / pack of 12 / pack of 24).");
+      console.log("Seeded 4 sample inventory items with packaging tiers.");
     }
   } else {
-    // Backfill packagings + category for pre-existing items from an older install.
     const genCat = db.prepare("SELECT id FROM categories WHERE code='GEN'").get();
     const itemsMissingCat = db.prepare("SELECT id FROM items WHERE category_id IS NULL").all();
     for (const it of itemsMissingCat) {
@@ -539,20 +854,28 @@ function seedIfEmpty() {
 }
 
 initSchema();
-migrateUsersTableIfNeeded();
+migrateSchema();
 seedIfEmpty();
 migrateDepartmentsFromText();
+backfillUserRoles();
 
 module.exports = {
   db,
   ROLES,
+  ROLE_PRIORITY,
   SIGNOFF_ROLES,
+  CLEARANCE_ROLES,
   BACKOFFICE_ROLES,
+  primaryRole,
   nowIso,
   nextReqNo,
+  nextClearanceRef,
   nextItemCode,
   nextDeptCode,
   nextCategoryCode,
+  nextSubcategoryCode,
+  rolesForUser,
+  setUserRoles,
   audit,
   notifyUsers,
   notifyRoles,

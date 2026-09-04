@@ -37,10 +37,12 @@ export default function HodDashboard() {
       <p className="text-muted">Raise and track requisitions against available store inventory.</p>
 
       <Row>
-        <StatCard label="Total Requisitions" value={stats.myTotal} to="/requisitions" />
-        <StatCard label="Pending" value={stats.myPending} warn={stats.myPending > 0} to="/requisitions?status=pending" />
-        <StatCard label="Approved (Awaiting Issue)" value={stats.myApproved} to="/requisitions?status=approved" />
-        <StatCard label="Issued" value={stats.myIssued} to="/requisitions?status=issued" />
+        <StatCard label="Total Requisitions" value={stats.myTotal} md={3} to="/requisitions" />
+        <StatCard label="Pending" value={stats.myPending} warn={stats.myPending > 0} md={3} to="/requisitions?status=pending" />
+        <StatCard label="Needs My Response" value={stats.myRecommended} warn={stats.myRecommended > 0} md={3} to="/requisitions?status=recommended" />
+        <StatCard label="Approved (Awaiting Issue)" value={stats.myApproved} md={3} to="/requisitions?status=approved" />
+        <StatCard label="Issued" value={stats.myIssued} md={3} to="/requisitions?status=issued" />
+        <StatCard label="Rejected" value={stats.myRejected} md={3} to="/requisitions?status=rejected" />
       </Row>
 
       <Card className="plasu-card p-3 mt-2">

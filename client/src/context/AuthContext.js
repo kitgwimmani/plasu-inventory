@@ -59,10 +59,30 @@ export const ROLE_LABELS = {
   superadmin: "Super Admin",
   ictadmin: "ICT Admin",
   hod: "Head of Department",
-  inventoryadmin: "Inventory Admin",
+  head_of_store: "Head of Store",
+  issuance_officer: "Issuance Officer",
   technical_expert: "Technical Expert",
   audit_officer: "Audit Officer",
   asset_officer: "Asset / Insurance Officer",
 };
 
-export const SIGNOFF_PARTY_ROLES = ["technical_expert", "audit_officer", "asset_officer"];
+// The three stock-receipt clearance signatories.
+export const CLEARANCE_ROLES = ["technical_expert", "audit_officer", "asset_officer"];
+// The two requisition clearance signatories, in signing order.
+export const SIGNOFF_ROLES = ["head_of_store", "issuance_officer"];
+
+// Does the user hold ANY of the given roles? Falls back to the legacy single
+// `role` field for a user object that predates multi-role.
+export function hasRole(user, ...roles) {
+  if (!user) return false;
+  const set = user.roles && user.roles.length ? user.roles : user.role ? [user.role] : [];
+  return roles.some((r) => set.includes(r));
+}
+
+// Roles that can see every requisition / department's data (vs. only their own).
+export const FULL_ACCESS_ROLES = ["superadmin", "ictadmin", "head_of_store", "issuance_officer"];
+
+export function rolesLabel(user) {
+  const set = user?.roles && user.roles.length ? user.roles : user?.role ? [user.role] : [];
+  return set.map((r) => ROLE_LABELS[r] || r).join(", ");
+}

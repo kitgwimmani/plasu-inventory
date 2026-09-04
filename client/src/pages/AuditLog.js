@@ -27,6 +27,7 @@ export default function AuditLog() {
       if (action && l.action !== action) return false;
       if (!term) return true;
       return (
+        (l.actor_name || "").toLowerCase().includes(term) ||
         (l.actor_email || "").toLowerCase().includes(term) ||
         l.entity_type.toLowerCase().includes(term) ||
         (l.details || "").toLowerCase().includes(term)
@@ -63,7 +64,10 @@ export default function AuditLog() {
             {pageRows.map((log) => (
               <tr key={log.id}>
                 <td>{formatDateTime(log.created_at)}</td>
-                <td>{log.actor_email || "—"}</td>
+                <td>
+                  {log.actor_name || "—"}
+                  {log.actor_email && <div className="text-muted small">{log.actor_email}</div>}
+                </td>
                 <td><Badge bg="secondary">{log.action}</Badge></td>
                 <td>{log.entity_type} #{log.entity_id}</td>
                 <td className="text-muted small">{log.details}</td>

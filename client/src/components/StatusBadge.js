@@ -2,7 +2,8 @@ import React from "react";
 import { Badge } from "react-bootstrap";
 
 const LABELS = {
-  pending: "Pending Approval",
+  pending: "Pending Review",
+  recommended: "Recommended – Awaiting Requester",
   approved: "Approved – Awaiting Signoff/Issue",
   issued: "Issued",
   rejected: "Rejected",

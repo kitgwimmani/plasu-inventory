@@ -43,9 +43,13 @@ export default function AdminDashboard() {
       </Row>
       <Row>
         <StatCard label="Pending Requisitions" value={stats.pendingRequisitions} to="/requisitions?status=pending" />
+        <StatCard label="Recommended (With Requester)" value={stats.recommendedRequisitions} to="/requisitions?status=recommended" />
         <StatCard label="Approved (Awaiting Issue)" value={stats.approvedRequisitions} to="/requisitions?status=approved" />
         <StatCard label="Issued Requisitions" value={stats.issuedRequisitions} to="/requisitions?status=issued" />
+      </Row>
+      <Row>
         <StatCard label="Rejected Requisitions" value={stats.rejectedRequisitions} to="/requisitions?status=rejected" />
+        <StatCard label="Clearance Requests Pending" value={stats.pendingClearance} to="/clearance?status=pending" />
       </Row>
 
       <Row>
@@ -79,7 +83,7 @@ export default function AdminDashboard() {
             {stats.recentActivity.map((log) => (
               <tr key={log.id}>
                 <td>{formatDateTime(log.created_at)}</td>
-                <td>{log.actor_email || "—"}</td>
+                <td>{log.actor_name || log.actor_email || "—"}</td>
                 <td><Badge bg="secondary">{log.action}</Badge></td>
                 <td>{log.entity_type} #{log.entity_id}</td>
               </tr>

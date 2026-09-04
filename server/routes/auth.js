@@ -2,7 +2,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { db, audit, nowIso } = require("../db/init");
+const { db, audit, nowIso, rolesForUser } = require("../db/init");
 const { requireAuth, JWT_SECRET } = require("../middleware/auth");
 
 const router = express.Router();
@@ -31,6 +31,7 @@ router.post("/login", (req, res) => {
   const token = jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
   audit(user.id, user.email, "LOGIN_SUCCESS", "USER", user.id, {});
 
+  const roles = rolesForUser(user.id);
   res.json({
     token,
     user: {
@@ -38,6 +39,7 @@ router.post("/login", (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      roles: roles.length ? roles : [user.role],
       department: user.department,
     },
   });

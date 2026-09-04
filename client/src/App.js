@@ -10,11 +10,22 @@ import Reports from "./pages/Reports";
 import Requisitions from "./pages/Requisitions";
 import CreateRequisition from "./pages/CreateRequisition";
 import RequisitionDetail from "./pages/RequisitionDetail";
+import Clearance from "./pages/Clearance";
+import ClearanceDetail from "./pages/ClearanceDetail";
 import ChangePassword from "./pages/ChangePassword";
 import AuditLog from "./pages/AuditLog";
 import NotFound from "./pages/NotFound";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+const CLEARANCE_ACCESS = [
+  "head_of_store",
+  "superadmin",
+  "ictadmin",
+  "technical_expert",
+  "audit_officer",
+  "asset_officer",
+];
 
 export default function App() {
   return (
@@ -41,6 +52,22 @@ export default function App() {
           }
         />
         <Route path="/requisitions/:id" element={<RequisitionDetail />} />
+        <Route
+          path="/clearance"
+          element={
+            <ProtectedRoute roles={CLEARANCE_ACCESS}>
+              <Clearance />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/clearance/:id"
+          element={
+            <ProtectedRoute roles={CLEARANCE_ACCESS}>
+              <ClearanceDetail />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/reports" element={<Reports />} />
         <Route
           path="/users"
@@ -61,7 +88,7 @@ export default function App() {
         <Route
           path="/categories"
           element={
-            <ProtectedRoute roles={["superadmin", "ictadmin"]}>
+            <ProtectedRoute roles={["superadmin", "ictadmin", "head_of_store"]}>
               <Categories />
             </ProtectedRoute>
           }

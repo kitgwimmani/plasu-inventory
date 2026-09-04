@@ -7,7 +7,19 @@ import Toolbar from "../components/Toolbar";
 import Pager from "../components/Pager";
 import usePagination from "../hooks/usePagination";
 
-const EMPTY_FORM = { name: "", email: "", password: "", role: "hod", department_id: "" };
+const EMPTY_FORM = { name: "", email: "", password: "", roles: ["hod"], department_id: "" };
+
+// Order shown in the create/edit checkbox list.
+const ROLE_ORDER = [
+  "hod",
+  "head_of_store",
+  "issuance_officer",
+  "technical_expert",
+  "audit_officer",
+  "asset_officer",
+  "ictadmin",
+  "superadmin",
+];
 
 export default function Users() {
   const [searchParams] = useSearchParams();
@@ -53,13 +65,30 @@ export default function Users() {
 
   const openEdit = (u) => {
     setEditing(u);
-    setForm({ name: u.name, email: u.email, password: "", role: u.role, department_id: u.department_id || "" });
+    setForm({
+      name: u.name,
+      email: u.email,
+      password: "",
+      roles: u.roles && u.roles.length ? u.roles : [u.role],
+      department_id: u.department_id || "",
+    });
     setError("");
     setShowModal(true);
   };
 
+  const toggleRole = (role) => {
+    setForm((f) => ({
+      ...f,
+      roles: f.roles.includes(role) ? f.roles.filter((r) => r !== role) : [...f.roles, role],
+    }));
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!form.roles || form.roles.length === 0) {
+      setError("Select at least one role.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -67,7 +96,7 @@ export default function Users() {
         await api.put(`/users/${editing.id}`, {
           name: form.name,
           email: form.email,
-          role: form.role,
+          roles: form.roles,
           department_id: form.department_id || null,
         });
         setSuccess(`User ${form.email} updated successfully.`);
@@ -148,7 +177,7 @@ export default function Users() {
             <tr>
               <th>Name</th>
               <th>Email</th>
-              <th>Role</th>
+              <th>Roles</th>
               <th>Department</th>
               <th>Status</th>
               <th></th>
@@ -159,7 +188,13 @@ export default function Users() {
               <tr key={u.id}>
                 <td>{u.name}</td>
                 <td>{u.email}</td>
-                <td>{ROLE_LABELS[u.role] || u.role}</td>
+                <td>
+                  {(u.roles && u.roles.length ? u.roles : [u.role]).map((r) => (
+                    <Badge key={r} bg="light" text="dark" className="border me-1 mb-1">
+                      {ROLE_LABELS[r] || r}
+                    </Badge>
+                  ))}
+                </td>
                 <td>{u.department_name || u.department || "—"}</td>
                 <td>
                   <Badge bg={u.is_active ? "success" : "secondary"}>
@@ -209,17 +244,21 @@ export default function Users() {
                   <Form.Control type="text" required minLength={6} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                 </Col>
               )}
-              <Col md={6} className="mb-3">
-                <Form.Label>Role</Form.Label>
-                <Form.Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  <option value="hod">Head of Department</option>
-                  <option value="inventoryadmin">Inventory Admin</option>
-                  <option value="technical_expert">Technical Expert</option>
-                  <option value="audit_officer">Audit Officer</option>
-                  <option value="asset_officer">Asset / Insurance Officer</option>
-                  <option value="ictadmin">ICT Admin</option>
-                  <option value="superadmin">Super Admin</option>
-                </Form.Select>
+              <Col md={12} className="mb-3">
+                <Form.Label>Roles</Form.Label>
+                <div className="d-flex flex-wrap gap-3 border rounded p-2">
+                  {ROLE_ORDER.map((r) => (
+                    <Form.Check
+                      key={r}
+                      type="checkbox"
+                      id={`role-${r}`}
+                      label={ROLE_LABELS[r] || r}
+                      checked={form.roles.includes(r)}
+                      onChange={() => toggleRole(r)}
+                    />
+                  ))}
+                </div>
+                <Form.Text muted>A user can hold several roles at once.</Form.Text>
               </Col>
               <Col md={6} className="mb-3">
                 <Form.Label>Department / Unit</Form.Label>

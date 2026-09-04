@@ -71,7 +71,7 @@ export default function InventoryReportPrint({ items, summary, filtersSummary, g
         </tbody>
       </Table>
 
-      <SignatureBlock labels={["Prepared By (Store Officer)", "Verified By (Inventory Admin)", "Approved By (ICT Admin)"]} />
+      <SignatureBlock labels={["Prepared By (Store Officer)", "Verified By (Head of Store)", "Approved By (ICT Admin)"]} />
     </div>
   );
 }

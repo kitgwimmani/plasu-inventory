@@ -1,11 +1,9 @@
 import React, { useState } from "react";
 import { Navbar, Nav, Container, Dropdown, NavDropdown } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth, ROLE_LABELS } from "../context/AuthContext";
+import { useAuth, hasRole, rolesLabel, CLEARANCE_ROLES } from "../context/AuthContext";
 import NotificationBell from "./NotificationBell";
 import api from "../api/axios";
-
-const ADMIN_ROLES = ["superadmin", "ictadmin"];
 
 export default function TopNav() {
   const { user, logout } = useAuth();
@@ -19,7 +17,9 @@ export default function TopNav() {
     navigate("/login");
   };
 
-  const isAdmin = ADMIN_ROLES.includes(user.role);
+  const isAdmin = hasRole(user, "superadmin", "ictadmin");
+  const canManageStore = hasRole(user, "head_of_store");
+  const canSeeClearance = hasRole(user, "head_of_store", "superadmin", "ictadmin", ...CLEARANCE_ROLES);
 
   const handleBackup = async () => {
     setBackingUp(true);
@@ -58,7 +58,7 @@ export default function TopNav() {
           <Dropdown align="end">
             <Dropdown.Toggle as="a" className="nav-link" role="button" style={{ cursor: "pointer" }}>
               <i className="bi bi-person-circle me-1" />
-              {user.name} <span className="text-warning">({ROLE_LABELS[user.role]})</span>
+              {user.name} <span className="text-warning">({rolesLabel(user)})</span>
             </Dropdown.Toggle>
             <Dropdown.Menu>
               <Dropdown.Item as={Link} to="/change-password">
@@ -77,7 +77,13 @@ export default function TopNav() {
             <Nav.Link as={Link} to="/dashboard"><i className="bi bi-speedometer2 me-1" />Dashboard</Nav.Link>
             <Nav.Link as={Link} to="/inventory"><i className="bi bi-box-seam me-1" />Inventory</Nav.Link>
             <Nav.Link as={Link} to="/requisitions"><i className="bi bi-file-earmark-text me-1" />Requisitions</Nav.Link>
+            {canSeeClearance && (
+              <Nav.Link as={Link} to="/clearance"><i className="bi bi-clipboard-check me-1" />Clearance</Nav.Link>
+            )}
             <Nav.Link as={Link} to="/reports"><i className="bi bi-printer me-1" />Reports</Nav.Link>
+            {!isAdmin && canManageStore && (
+              <Nav.Link as={Link} to="/categories"><i className="bi bi-tags me-1" />Categories</Nav.Link>
+            )}
             {isAdmin && (
               <NavDropdown title={<><i className="bi bi-gear me-1" />Admin</>} id="admin-nav-dropdown">
                 <NavDropdown.Item as={Link} to="/users"><i className="bi bi-people me-2" />Users</NavDropdown.Item>

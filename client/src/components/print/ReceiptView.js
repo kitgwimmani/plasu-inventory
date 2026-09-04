@@ -5,10 +5,8 @@ import SignatureBlock from "./SignatureBlock";
 import { formatDate, formatDateTime } from "../../utils/formatDate";
 
 const SIGNOFF_LABELS = {
-  requester: "Requester / User (HOD)",
-  technical_expert: "Technical Expert",
-  audit_officer: "Audit Officer",
-  asset_officer: "Asset / Insurance Officer",
+  head_of_store: "Head of Store",
+  issuance_officer: "Issuance Officer",
 };
 
 // A printable delivery/issue receipt for a single requisition — handed to the
@@ -62,18 +60,18 @@ export default function ReceiptView({ requisition }) {
 
       <p className="text-muted small">
         This receipt confirms that the item(s) listed above were issued from the Central Store
-        against the requisition referenced, following completion of all required clearance
-        signoffs (Requester, Technical Expert, Audit Officer, Asset/Insurance Officer).
+        against the requisition referenced, following completion of the required clearance
+        signatures (Head of Store, then Issuance Officer).
       </p>
 
       <SignatureBlock
         labels={[
           { label: "Requester / User (HOD)", filled: r.hod_name },
-          ...["technical_expert", "audit_officer", "asset_officer"].map((role) => {
-            const s = r.signoffs.find((x) => x.role_label === role);
+          ...["head_of_store", "issuance_officer"].map((role) => {
+            const s = (r.signoffs || []).find((x) => x.role_label === role);
             return { label: SIGNOFF_LABELS[role], filled: s?.signed_by_name || "" };
           }),
-          { label: "Issued By (Inventory Admin)", filled: r.issued_by_name || "" },
+          { label: "Issued By", filled: r.issued_by_name || "" },
         ]}
       />
     </div>

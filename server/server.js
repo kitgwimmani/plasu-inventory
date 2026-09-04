@@ -17,6 +17,7 @@ const departmentRoutes = require("./routes/departments");
 const categoryRoutes = require("./routes/categories");
 const notificationRoutes = require("./routes/notifications");
 const reportRoutes = require("./routes/reports");
+const clearanceRoutes = require("./routes/clearance");
 const backupRoutes = require("./routes/backup");
 
 const app = express();
@@ -44,6 +45,7 @@ app.use("/api/departments", departmentRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/clearance", clearanceRoutes);
 app.use("/api/backup", backupRoutes);
 
 // Central error handler
