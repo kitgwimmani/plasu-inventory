@@ -333,6 +333,27 @@ body {
   min-height: 600px;
 }
 
+/* Wide/data-heavy reports (stock movements, requisitions with many columns)
+   can opt into a landscape paper layout — both for the on-screen preview and,
+   via the inherited CSS "page" property, for the actual printed/PDF page
+   size (Chrome/Edge; Firefox/Safari fall back to the print dialog's own
+   orientation control, so these still print fine there, just not pre-set). */
+.print-overlay.landscape {
+  page: plasu-landscape;
+}
+.print-overlay.landscape .print-page {
+  max-width: 1200px;
+}
+
+/* Compact density option for long tables, so more rows fit per printed page
+   without shrinking the browser's print zoom. */
+.print-overlay.compact .print-page table {
+  font-size: 0.78rem;
+}
+.print-overlay.compact .signature-block {
+  margin-top: 2rem;
+}
+
 .print-letterhead {
   position: relative;
 }
@@ -427,6 +448,18 @@ body {
   margin-top: 0.25rem;
 }
 
+/* Default paper size/margins for every printed report and receipt; reports
+   that opt into .print-overlay.landscape switch to the named "plasu-landscape"
+   page below instead (see the inherited `page` property set there). */
+@page {
+  size: A4;
+  margin: 12mm;
+}
+@page plasu-landscape {
+  size: A4 landscape;
+  margin: 12mm;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -448,7 +481,22 @@ body {
   .print-page {
     box-shadow: none;
     max-width: 100%;
-    padding: 0.5in;
+    padding: 0;
+  }
+
+  /* Paper-friendly table behaviour: repeat the header row on every printed
+     page and never slice a single row across a page break. */
+  .print-page table thead {
+    display: table-header-group;
+  }
+  .print-page table tr {
+    page-break-inside: avoid;
+  }
+  .print-page .signature-block {
+    page-break-inside: avoid;
+  }
+  .print-page .report-summary-row {
+    page-break-after: avoid;
   }
 }
 
